@@ -414,7 +414,10 @@ Irány: Native Instruments Massive XL-szerű hardveres panel, visszafogottan (a 
 - [x] **Natív fejléc színe:** `titleBarStyle: "Transparent"`, így a három gombos léc az ablak háttérszínét mutatja; ezt a JS a téma szerint állítja (`setBackgroundColor` + `setTheme`, új jogosultságok a `capabilities/default.json`-ban). Sötét: **#1E1E1E**, világos: **#F6F6F6** – ugyanez a `--background` és a fejlécek színe, így a natív léc és az app fejléce egy felület.
 - [x] Paletta macOS-szerű semleges szürkékre: sötétben #1E1E1E alap, #262626 panelek; világosban #F6F6F6 alap, fehér panelek. A poti világos módban is látszik (`--knob-edge` perem, sötétebb árok, mélyebb cián); a waveform világosban is levendula.
 
+- [x] Holdikon: saját, telt holdsarló (a kis csillag 16 px-en pontnak látszott, kivettük) (`ThemeToggle`), nem `aria-pressed` gomb, így nincs körülötte keret; sötétben világosabb.
 - [x] Javítások: a waveform idővonala és a hover-címke CSS-változókat kap (a shadow rootba is öröklődnek), így témaváltáskor is helyes a színük; a lista minimális szélessége az oszlopokból számolódik, és ha nem fér ki, az egész lista (fejléc, kijelölés) együtt görget oldalra.
+
+- [x] **Logó:** szemből nézett lófej, a homlokcsík a K (a felhasználó vázlatából vektorizálva, potrace; a K az SF Pro Semibold-hoz igazítva, egyenes szár, vízszintes vágások, a homlokcsíkba fut). Forrás: `assets/logo/khole-icon.svg` (app-ikon, macOS-rács: 824 px-es lekerekített négyzet 1024-en, grafit átmenet) és `assets/logo/khole-mark.svg` (csak a ló). Az `src-tauri/icons` desktop-készlete `tauri icon`-nal készült ebből (android / ios nem kell). A Start képernyőn `LogoMark` + „KHole”; színe `--logo-horse` / `--logo-mark` (világosban mélyebb lila, fehér rajzolat).
 
 ### Kézi teszt (Design)
 1. `npm run tauri dev` → sötét és világos rendszertémában is: Start, Setup, Triage, Summary. Az Import Folder lila, a gombok semlegesek, narancs csak az utoljára használt csempén és a bekapcsolt lakaton.
@@ -565,6 +568,7 @@ Alapelvek:
 | 2026-11-16 | A beírt tempó: ±16-ig százalék, 40–300 között cél-BPM | Egy mező mindkettőre, külön kapcsoló nélkül; a két tartomány nem fed át |
 | 2026-11-16 | Átlátszó natív fejléc + ablakháttér a téma színére (#1E1E1E / #F6F6F6), nem saját rajzolt fejléc (Overlay) | A felhasználó kérése: a léc legyen az app színe; így a natív közlekedési lámpák, a húzás és a dupla kattintás érintetlen, a layoutot nem kell eltolni |
 | 2026-11-16 | Témaválasztás: system / light / dark, egy holdgombbal; a rendszerrel egyező választás = rendszer követése | Egy gomb elég (a felhasználó holdikont kért); külön „System” opció nélkül is vissza lehet térni a rendszerhez |
+| 2026-11-16 | Logó: lófej, a homlokcsík a K; a felirat egyszínű, csak a ló lila | A felhasználó vázlata; szakmabeli kikacsintás, de letisztult. A K az app betűjéhez igazodik, így a logó és a felirat egy család |
 | 2026-11-16 | Hangerő a WebView `<audio>.volume`-jával, négyzetes görbével, csak előnézeti (a fájlhoz nem nyúl) | Lineáris erősítésnél a poti alsó fele szinte néma lenne; a beállítás nézet-kényelem, ezért `localStorage` |
 
 ---
@@ -738,3 +742,5 @@ Alapelvek:
 - Harmadik kör: szolid görgetősávok, tempó beírással (% vagy BPM), Fixed tempo a Setupban (`0014` migráció), Open in… csak ikon. `typecheck`, `vite build`, `cargo fmt/clippy/test` (94 teszt) tiszta; a felületet nem láttam.
 - Negyedik kör: világos / sötét mód holdgombbal, átlátszó natív fejléc a téma színével (#1E1E1E / #F6F6F6), macOS-szerű semleges paletta, a poti világos módban is látszik. `typecheck`, `vite build`, `clippy` tiszta; a felületet nem láttam.
 - Ötödik kör: waveform-feliratok színe témaváltáskor, széles oszlopoknál vízszintes görgetés. Commit és push a felhasználó kérésére (a #13–#15, #17 és a Design kézi tesztje még hátravan).
+- Holdikon csere (saját sarló, csillag nélkül), a keret (pressed-háttér) megszűnt.
+- Logó: vektorizált lófej app-stílusú K-val, app-ikon az `src-tauri/icons` alá, Start képernyő. Commit és push a holdikonnal együtt.

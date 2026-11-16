@@ -99,6 +99,9 @@
     --knob-edge: rgb(0 0 0 / 22%);
     /* Screen headers continue the window's title bar. */
     --panel-header: #f6f6f6;
+    /* Logo (Start screen): a deeper lavender on light, white markings. */
+    --logo-horse: #7a5ae6;
+    --logo-mark: #ffffff;
     /* Waveform: the part already heard is the lighter shade. */
     --waveform: oklch(0.45 0.09 292);
     --waveform-played: oklch(0.76 0.05 292);
@@ -148,6 +151,8 @@
     --knob-cap: #454545;
     --knob-edge: rgb(255 255 255 / 10%);
     --panel-header: #1e1e1e;
+    --logo-horse: #8b6cf0;
+    --logo-mark: #eceaf5;
     --sidebar: #222222;
     --sidebar-foreground: #ececec;
     --sidebar-primary: oklch(0.72 0.15 292);

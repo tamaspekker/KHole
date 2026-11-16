@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FolderOpen, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LogoMark } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, type RecentSession } from "@/lib/api";
 import { fileName, parentPath, tildify } from "@/lib/format";
@@ -52,8 +53,9 @@ export function StartScreen() {
     <main className="relative flex h-full flex-col items-center justify-center gap-10 p-8">
       <ThemeToggle className="absolute top-2 right-3" />
       <div className="flex flex-col items-center gap-5">
-        <h1 className="text-4xl font-semibold tracking-tight">
-          K<span className="text-brand">Hole</span>
+        <h1 className="flex items-center gap-4 text-4xl font-semibold tracking-tight">
+          <LogoMark className="h-20 w-auto" />
+          KHole
         </h1>
         <Button size="lg" onClick={() => void importFolder()} disabled={opening}>
           <FolderOpen data-icon="inline-start" />
