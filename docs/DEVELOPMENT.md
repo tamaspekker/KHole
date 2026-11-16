@@ -417,7 +417,11 @@ Irány: Native Instruments Massive XL-szerű hardveres panel, visszafogottan (a 
 - [x] Holdikon: saját, telt holdsarló (a kis csillag 16 px-en pontnak látszott, kivettük) (`ThemeToggle`), nem `aria-pressed` gomb, így nincs körülötte keret; sötétben világosabb.
 - [x] Javítások: a waveform idővonala és a hover-címke CSS-változókat kap (a shadow rootba is öröklődnek), így témaváltáskor is helyes a színük; a lista minimális szélessége az oszlopokból számolódik, és ha nem fér ki, az egész lista (fejléc, kijelölés) együtt görget oldalra.
 
-- [x] **Logó:** szemből nézett lófej, a homlokcsík a K (a felhasználó vázlatából vektorizálva, potrace; a K az SF Pro Semibold-hoz igazítva, egyenes szár, vízszintes vágások, a homlokcsíkba fut). Forrás: `assets/logo/khole-icon.svg` (app-ikon, macOS-rács: 824 px-es lekerekített négyzet 1024-en, grafit átmenet) és `assets/logo/khole-mark.svg` (csak a ló). Az `src-tauri/icons` desktop-készlete `tauri icon`-nal készült ebből (android / ios nem kell). A Start képernyőn `LogoMark` + „KHole”; színe `--logo-horse` / `--logo-mark` (világosban mélyebb lila, fehér rajzolat).
+- [x] **Logó:** szemből nézett lófej, a homlokcsík a K (a felhasználó vázlatából vektorizálva, potrace; a K az SF Pro Semibold-hoz igazítva, egyenes szár, vízszintes vágások, a homlokcsíkba fut). Forrás: `assets/logo/khole-icon.svg` (app-ikon, macOS-rács: 824 px-es lekerekített négyzet 1024-en, grafit átmenet) és `assets/logo/khole-mark.svg` (csak a ló). Az `src-tauri/icons` desktop-készlete `tauri icon`-nal készült ebből (android / ios nem kell). A Start képernyőn csak a ló (`LogoMark`, 144 px magas, alatta 56 px-es plusz térköz; a név `sr-only` a címsorban); színe `--logo-horse` / `--logo-mark` (világosban mélyebb lila, fehér rajzolat).
+
+- [x] A futtatható fájl neve `KHole` (`[[bin]]` a `Cargo.toml`-ban, `mainBinaryName` a `tauri.conf.json`-ban): `tauri dev` alatt a Dock a bináris nevét mutatja, eddig „khole” volt. A debug `.app` ellenőrizve: `Contents/MacOS/KHole`, `CFBundleName` = KHole.
+
+- [x] **Liquid Glass ikon (macOS 26):** `src-tauri/icons/KHole.icon` (Icon Composer dokumentum: két réteg, `assets/logo/icon-composer/1-head.svg` üveges, `2-markings.svg` fölötte; háttér grafit automatikus átmenet #262626, sötétben `system-dark`). A `tauri.conf.json` ikonlistájában; a bundler `actool`-lal `Assets.car`-t fordít belőle (`CFBundleIconName` = Icon), a `.icns` marad tartaléknak. Xcode 26 alatt (pl. régebbi CI-kép) a bundler figyelmeztetéssel kihagyja. `tauri dev` alatt nem látszik (nincs bundle). A rétegek 100%-on (a 85%-os kicsinyítést a felhasználó visszavonta). **Buktató:** ha az `actool` minden `.icon`-ra „attempt to insert nil object” kivétellel elszáll (a bundler „Failed to create app Assets.car”), a háttérsegéd `ibtoold` ragadt be: `pkill -x ibtoold`, és újra megy. Az Icon Composer mentéskor a nála nyitott állapotot írja vissza; a világos háttér legyen ott is grafit.
 
 ### Kézi teszt (Design)
 1. `npm run tauri dev` → sötét és világos rendszertémában is: Start, Setup, Triage, Summary. Az Import Folder lila, a gombok semlegesek, narancs csak az utoljára használt csempén és a bekapcsolt lakaton.
@@ -569,6 +573,7 @@ Alapelvek:
 | 2026-11-16 | Átlátszó natív fejléc + ablakháttér a téma színére (#1E1E1E / #F6F6F6), nem saját rajzolt fejléc (Overlay) | A felhasználó kérése: a léc legyen az app színe; így a natív közlekedési lámpák, a húzás és a dupla kattintás érintetlen, a layoutot nem kell eltolni |
 | 2026-11-16 | Témaválasztás: system / light / dark, egy holdgombbal; a rendszerrel egyező választás = rendszer követése | Egy gomb elég (a felhasználó holdikont kért); külön „System” opció nélkül is vissza lehet térni a rendszerhez |
 | 2026-11-16 | Logó: lófej, a homlokcsík a K; a felirat egyszínű, csak a ló lila | A felhasználó vázlata; szakmabeli kikacsintás, de letisztult. A K az app betűjéhez igazodik, így a logó és a felirat egy család |
+| 2026-11-16 | App-ikon Icon Composer `.icon`-ként is (Liquid Glass), a `.icns` tartalék | macOS 26 alatt csak így kap a Dock-ikon üveges keretet; a Tauri bundler támogatja |
 | 2026-11-16 | Hangerő a WebView `<audio>.volume`-jával, négyzetes görbével, csak előnézeti (a fájlhoz nem nyúl) | Lineáris erősítésnél a poti alsó fele szinte néma lenne; a beállítás nézet-kényelem, ezért `localStorage` |
 
 ---
@@ -744,3 +749,5 @@ Alapelvek:
 - Ötödik kör: waveform-feliratok színe témaváltáskor, széles oszlopoknál vízszintes görgetés. Commit és push a felhasználó kérésére (a #13–#15, #17 és a Design kézi tesztje még hátravan).
 - Holdikon csere (saját sarló, csillag nélkül), a keret (pressed-háttér) megszűnt.
 - Logó: vektorizált lófej app-stílusú K-val, app-ikon az `src-tauri/icons` alá, Start képernyő. Commit és push a holdikonnal együtt.
+- Start képernyő: csak a lófej, nagyobban; a bináris neve `KHole` (Dock-felirat `tauri dev` alatt).
+- Liquid Glass app-ikon: `KHole.icon` (a felhasználó Icon Composerben rakta össze az előkészített rétegekből), `Assets.car` a debug buildben ellenőrizve.

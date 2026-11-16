@@ -53,9 +53,10 @@ export function StartScreen() {
     <main className="relative flex h-full flex-col items-center justify-center gap-10 p-8">
       <ThemeToggle className="absolute top-2 right-3" />
       <div className="flex flex-col items-center gap-5">
-        <h1 className="flex items-center gap-4 text-4xl font-semibold tracking-tight">
-          <LogoMark className="h-20 w-auto" />
-          KHole
+        {/* Extra room under the logo: it is the screen's emblem, not part of the button group. */}
+        <h1 className="mb-14">
+          <LogoMark className="h-36 w-auto" />
+          <span className="sr-only">KHole</span>
         </h1>
         <Button size="lg" onClick={() => void importFolder()} disabled={opening}>
           <FolderOpen data-icon="inline-start" />

@@ -16,6 +16,12 @@ edition = "2024"
 name = "khole_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# The executable is "KHole": the Dock and Activity Monitor show its name while `tauri dev`
+# runs it outside an app bundle (the bundle uses `mainBinaryName`, tauri.conf.json).
+[[bin]]
+name = "KHole"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

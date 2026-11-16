@@ -1,5 +1,5 @@
 /**
- * The KHole horse, shown next to the name (so it is decorative). Same drawing as
+ * The KHole horse (decorative: the heading it sits in carries the name). Same drawing as
  * `assets/logo/khole-mark.svg`; the colours come from `--logo-horse` / `--logo-mark` so it
  * follows the appearance.
  */
