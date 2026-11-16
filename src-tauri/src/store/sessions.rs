@@ -12,7 +12,6 @@ use crate::error::{Error, Result};
 pub struct Session {
     pub id: i64,
     pub source_path: String,
-    pub include_sub: bool,
     pub mode: String,
     pub start_at: f64,
     pub auto_next: bool,
@@ -21,22 +20,28 @@ pub struct Session {
     pub bpm_min: Option<u32>,
     /// The track list's sort order (UI-defined JSON); `None`: folder order.
     pub sort: Option<String>,
+    /// The subfolder the list shows (folder tree), relative to the source; `None`: all.
+    pub folder: Option<String>,
+    /// Fixed preview tempo: every track plays at this BPM (within the tempo range);
+    /// `None`: off.
+    pub target_bpm: Option<f64>,
 }
 
 const COLUMNS: &str =
-    "id, source_path, include_sub, mode, start_at, auto_next, current_track, bpm_min, sort";
+    "id, source_path, mode, start_at, auto_next, current_track, bpm_min, sort, folder, target_bpm";
 
 fn from_row(r: &Row) -> rusqlite::Result<Session> {
     Ok(Session {
         id: r.get(0)?,
         source_path: r.get(1)?,
-        include_sub: r.get(2)?,
-        mode: r.get(3)?,
-        start_at: r.get(4)?,
-        auto_next: r.get(5)?,
-        current_track: r.get(6)?,
-        bpm_min: r.get(7)?,
-        sort: r.get(8)?,
+        mode: r.get(2)?,
+        start_at: r.get(3)?,
+        auto_next: r.get(4)?,
+        current_track: r.get(5)?,
+        bpm_min: r.get(6)?,
+        sort: r.get(7)?,
+        folder: r.get(8)?,
+        target_bpm: r.get(9)?,
     })
 }
 
@@ -44,7 +49,7 @@ fn from_row(r: &Row) -> rusqlite::Result<Session> {
 /// recent list.
 ///
 /// A folder opened for the first time starts from the most recently used session: its
-/// settings (Move / Copy, Start at, Auto-next, BPM range) and its destinations with their
+/// settings (Move / Copy, Start at, Auto-next, BPM range, fixed tempo) and its destinations with their
 /// number keys, so this week's promo folder is ready to Start. Include subfolders (a
 /// property of the folder) and the sort order start fresh; a destination that is the new
 /// source folder itself is left out.
@@ -70,9 +75,9 @@ pub fn open(conn: &Connection, source_path: &str, now: i64) -> Result<Session> {
         .optional()?;
     let id: i64 = tx.query_row(
         "INSERT INTO sessions (source_path, mode, start_at, auto_next, bpm_min,
-                               created_at, updated_at)
+                               target_bpm, created_at, updated_at)
          SELECT ?1, coalesce(t.mode, 'move'), coalesce(t.start_at, 0),
-                coalesce(t.auto_next, 1), t.bpm_min, ?2, ?2
+                coalesce(t.auto_next, 1), t.bpm_min, t.target_bpm, ?2, ?2
          FROM (SELECT 1) LEFT JOIN sessions t ON t.id = ?3
          RETURNING id",
         params![source_path, now, template],
@@ -101,8 +106,24 @@ pub fn get(conn: &Connection, id: i64) -> Result<Session> {
     .ok_or_else(|| Error::NotFound(format!("session {id}")))
 }
 
-pub fn set_include_sub(conn: &Connection, id: i64, value: bool, now: i64) -> Result<Session> {
-    update(conn, id, "include_sub", &value, now)
+/// Longest folder path accepted (a path, not a payload).
+const FOLDER_MAX: usize = 4096;
+
+/// The subfolder the list shows, relative to the source folder; `None` or empty: all of it.
+/// Only a plain relative path is stored (no `..`, not absolute).
+pub fn set_folder(conn: &Connection, id: i64, folder: Option<&str>, now: i64) -> Result<Session> {
+    let folder = folder
+        .map(|f| f.trim_matches('/'))
+        .filter(|f| !f.is_empty());
+    if let Some(f) = folder {
+        let plain = f.len() <= FOLDER_MAX
+            && f.split('/')
+                .all(|seg| !seg.is_empty() && seg != "." && seg != "..");
+        if !plain {
+            return Err(Error::Invalid(format!("not a subfolder: {f}")));
+        }
+    }
+    update(conn, id, "folder", &folder, now)
 }
 
 /// Where playback starts, as a fraction of the track (0 = from the top, 0.25, 0.4, …).
@@ -113,6 +134,17 @@ pub fn set_start_at(conn: &Connection, id: i64, value: f64, now: i64) -> Result<
         )));
     }
     update(conn, id, "start_at", &value, now)
+}
+
+/// Fixed preview tempo in BPM (40–300, two decimals); `None` turns it off.
+pub fn set_target_bpm(conn: &Connection, id: i64, value: Option<f64>, now: i64) -> Result<Session> {
+    if let Some(v) = value
+        && !(40.0..=300.0).contains(&v)
+    {
+        return Err(Error::Invalid(format!("tempo {v} BPM is out of range")));
+    }
+    let value = value.map(|v| (v * 100.0).round() / 100.0);
+    update(conn, id, "target_bpm", &value, now)
 }
 
 /// Move or copy when a track goes to a destination.
@@ -376,12 +408,36 @@ mod tests {
     }
 
     #[test]
+    fn target_bpm_is_checked_and_can_be_cleared() {
+        let store = Store::open_in_memory().unwrap();
+        let conn = store.conn().unwrap();
+        let a = open(&conn, "/music/promo", 1).unwrap().id;
+        assert!(get(&conn, a).unwrap().target_bpm.is_none());
+        let s = set_target_bpm(&conn, a, Some(125.456), 2).unwrap();
+        assert_eq!(s.target_bpm, Some(125.46));
+        assert!(matches!(
+            set_target_bpm(&conn, a, Some(20.0), 3),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            set_target_bpm(&conn, a, Some(f64::NAN), 3),
+            Err(Error::Invalid(_))
+        ));
+        assert!(
+            set_target_bpm(&conn, a, None, 4)
+                .unwrap()
+                .target_bpm
+                .is_none()
+        );
+    }
+
+    #[test]
     fn open_is_get_or_create() {
         let store = Store::open_in_memory().unwrap();
         let conn = store.conn().unwrap();
         let a = open(&conn, "/music/promo", 1).unwrap();
         assert_eq!(a.mode, "move");
-        assert!(!a.include_sub && a.auto_next && a.start_at == 0.0);
+        assert!(a.folder.is_none() && a.auto_next && a.start_at == 0.0);
         let b = open(&conn, "/music/promo", 2).unwrap();
         assert_eq!(a, b);
         assert_eq!(get(&conn, a.id).unwrap(), a);
@@ -397,7 +453,8 @@ mod tests {
         set_start_at(&conn, a, 0.4, 3).unwrap();
         set_auto_next(&conn, a, false, 4).unwrap();
         set_bpm_min(&conn, a, Some(88), 5).unwrap();
-        set_include_sub(&conn, a, true, 6).unwrap();
+        set_target_bpm(&conn, a, Some(126.0), 5).unwrap();
+        set_folder(&conn, a, Some("Techno"), 6).unwrap();
         set_sort(&conn, a, Some(r#"[{"id":"bpm","desc":true}]"#), 7).unwrap();
         crate::store::destinations::add(&conn, a, "/crates/peak").unwrap();
         let d2 = crate::store::destinations::add(&conn, a, "/crates/warmup")
@@ -408,10 +465,16 @@ mod tests {
 
         let b = open(&conn, "/promo/w46", 10).unwrap();
         assert_eq!(
-            (b.mode.as_str(), b.start_at, b.auto_next, b.bpm_min),
-            ("copy", 0.4, false, Some(88))
+            (
+                b.mode.as_str(),
+                b.start_at,
+                b.auto_next,
+                b.bpm_min,
+                b.target_bpm
+            ),
+            ("copy", 0.4, false, Some(88), Some(126.0))
         );
-        assert!(!b.include_sub && b.sort.is_none() && b.current_track.is_none());
+        assert!(b.folder.is_none() && b.sort.is_none() && b.current_track.is_none());
         let dests: Vec<_> = crate::store::destinations::list(&conn, b.id)
             .unwrap()
             .into_iter()
@@ -523,13 +586,25 @@ mod tests {
     }
 
     #[test]
-    fn include_sub_persists() {
+    fn folder_persists_and_is_checked() {
         let store = Store::open_in_memory().unwrap();
         let conn = store.conn().unwrap();
         let id = open(&conn, "/x", 1).unwrap().id;
-        assert!(set_include_sub(&conn, id, true, 2).unwrap().include_sub);
-        assert!(get(&conn, id).unwrap().include_sub);
-        assert!(set_include_sub(&conn, 42, true, 2).is_err());
+        let s = set_folder(&conn, id, Some("Label/2026 W46/"), 2).unwrap();
+        assert_eq!(s.folder.as_deref(), Some("Label/2026 W46"));
+        assert_eq!(
+            get(&conn, id).unwrap().folder.as_deref(),
+            Some("Label/2026 W46")
+        );
+        assert_eq!(set_folder(&conn, id, Some(""), 3).unwrap().folder, None);
+        assert_eq!(set_folder(&conn, id, None, 3).unwrap().folder, None);
+        for bad in ["../up", "a/../../b", "a/./b", "a//b"] {
+            assert!(
+                matches!(set_folder(&conn, id, Some(bad), 4), Err(Error::Invalid(_))),
+                "{bad}"
+            );
+        }
+        assert!(set_folder(&conn, 42, Some("a"), 2).is_err());
     }
 
     #[test]

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FolderOpen, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, type RecentSession } from "@/lib/api";
 import { fileName, parentPath, tildify } from "@/lib/format";
 import { importFolder, openFolder, useApp } from "@/state/app";
@@ -48,7 +49,8 @@ export function StartScreen() {
   }, []);
 
   return (
-    <main className="flex h-full flex-col items-center justify-center gap-10 p-8">
+    <main className="relative flex h-full flex-col items-center justify-center gap-10 p-8">
+      <ThemeToggle className="absolute top-2 right-3" />
       <div className="flex flex-col items-center gap-5">
         <h1 className="text-4xl font-semibold tracking-tight">
           K<span className="text-brand">Hole</span>

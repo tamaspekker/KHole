@@ -236,12 +236,17 @@ async function updateSettings(call: (id: number) => Promise<Session>): Promise<v
   }
 }
 
-export async function setIncludeSub(value: boolean): Promise<void> {
-  await updateSettings((id) => api.setIncludeSubfolders(id, value));
-  void rescan();
+/** The subfolder the list shows (folder tree); shown at once, saved quietly. */
+export function setFolder(folder: string | null): void {
+  const s = get().session;
+  if (!s || s.folder === folder) return;
+  set({ session: { ...s, folder } });
+  api.setFolder(s.id, folder).catch(() => {});
 }
 
 export const setStartAt = (value: number) => updateSettings((id) => api.setStartAt(id, value));
+export const setTargetBpm = (value: number | null) =>
+  updateSettings((id) => api.setTargetBpm(id, value));
 export const setMode = (mode: Session["mode"]) => updateSettings((id) => api.setMode(id, mode));
 export const setAutoNext = (value: boolean) =>
   updateSettings((id) => api.setAutoNext(id, value));

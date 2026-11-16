@@ -14,12 +14,15 @@ use crate::analysis::queue::{Analyzer, Progress};
 use crate::analysis::{self, SidecarInfo};
 use crate::audio::{self, PeakRequests};
 use crate::error::{Error, Result};
-use crate::fileops::{self, Decision, Outcome, Undone, edit::Field};
+use crate::fileops::{self, Decision, Outcome, SessionUndone, Undone, edit::Field};
 use crate::finder::{self, App};
 use crate::library::scan::{self, ScanSummary};
 use crate::library::watch::Watcher;
+use crate::store::actions::{self, Stats};
 use crate::store::destinations::{self, Destination};
-use crate::store::{self, Store, sessions, sessions::RecentSession, sessions::Session, tracks};
+use crate::store::{
+    self, Store, sessions, sessions::RecentSession, sessions::Session, settings, tracks,
+};
 
 #[tauri::command]
 pub fn ping() -> &'static str {
@@ -227,13 +230,14 @@ pub fn set_sort(store: State<'_, Store>, session_id: i64, sort: Option<String>) 
     sessions::set_sort(&*store.conn()?, session_id, sort.as_deref(), store::now())
 }
 
+/// Remembers the subfolder the list shows (folder tree); `None`: all of the source.
 #[tauri::command]
-pub fn set_include_subfolders(
+pub fn set_folder(
     store: State<'_, Store>,
     session_id: i64,
-    value: bool,
+    folder: Option<String>,
 ) -> Result<Session> {
-    sessions::set_include_sub(&*store.conn()?, session_id, value, store::now())
+    sessions::set_folder(&*store.conn()?, session_id, folder.as_deref(), store::now())
 }
 
 #[tauri::command]
@@ -289,7 +293,8 @@ pub async fn scan_session(app: AppHandle, session_id: i64) -> Result<ScanSummary
             &worker.state::<Store>(),
             session_id,
             &root,
-            session.include_sub,
+            // Always the whole tree; the folder tree only filters the list.
+            true,
             &exclude,
             |done, total| {
                 if done == total || last.elapsed() >= PROGRESS_EVERY {
@@ -316,6 +321,15 @@ pub async fn scan_session(app: AppHandle, session_id: i64) -> Result<ScanSummary
 #[tauri::command]
 pub fn set_start_at(store: State<'_, Store>, session_id: i64, value: f64) -> Result<Session> {
     sessions::set_start_at(&*store.conn()?, session_id, value, store::now())
+}
+
+#[tauri::command]
+pub fn set_target_bpm(
+    store: State<'_, Store>,
+    session_id: i64,
+    value: Option<f64>,
+) -> Result<Session> {
+    sessions::set_target_bpm(&*store.conn()?, session_id, value, store::now())
 }
 
 #[tauri::command]
@@ -443,6 +457,62 @@ pub async fn undo(app: AppHandle, session_id: i64) -> Result<Option<Undone>> {
         fileops::undo_last(&app.state::<Store>(), session_id)
     })
     .await?
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UndoProgress {
+    session_id: i64,
+    done: usize,
+    total: usize,
+}
+
+/// Undo session (Summary): reverts every open action, newest first; emits
+/// `undo_progress`. Stops at the first action that cannot be undone and says why.
+#[tauri::command]
+pub async fn undo_session(app: AppHandle, session_id: i64) -> Result<SessionUndone> {
+    tauri::async_runtime::spawn_blocking(move || {
+        fileops::undo_session(&app.state::<Store>(), session_id, |done, total| {
+            let _ = app.emit(
+                "undo_progress",
+                UndoProgress {
+                    session_id,
+                    done,
+                    total,
+                },
+            );
+        })
+    })
+    .await?
+}
+
+/// What the Summary shows from the undo log (open actions, working time).
+#[tauri::command]
+pub fn session_stats(store: State<'_, Store>, session_id: i64) -> Result<Stats> {
+    actions::stats(&*store.conn()?, session_id)
+}
+
+/// Opens a destination folder of the session in Finder (Summary).
+#[tauri::command]
+pub fn open_destination(
+    store: State<'_, Store>,
+    session_id: i64,
+    destination_id: i64,
+) -> Result<()> {
+    let d = destinations::get(&*store.conn()?, session_id, destination_id)?;
+    finder::open_folder(Path::new(&d.path))
+}
+
+/// An app-wide preference (e.g. `keymap`); `None` if not set.
+#[tauri::command]
+pub fn get_setting(store: State<'_, Store>, key: String) -> Result<Option<String>> {
+    settings::get(&*store.conn()?, &key)
+}
+
+/// Stores an app-wide preference; `None` resets it to the default.
+#[tauri::command]
+pub fn set_setting(store: State<'_, Store>, key: String, value: Option<String>) -> Result<()> {
+    settings::set(&*store.conn()?, &key, value.as_deref())
 }
 
 /// Watches the session's source folder; a change made outside the app emits

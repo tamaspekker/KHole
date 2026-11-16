@@ -1,26 +1,51 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Eye, EyeOff, Keyboard, RefreshCw, SlidersHorizontal } from "lucide-react";
+import {
+  ChevronLeft,
+  ClipboardCheck,
+  Eye,
+  EyeOff,
+  Keyboard,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { DestinationBar, type Flash, type Notice } from "@/components/DestinationBar";
 import { DragGhost } from "@/components/DragGhost";
 import { MoveToDialog } from "@/components/MoveToDialog";
 import { ShortcutsDialog } from "@/components/ShortcutsDialog";
+import { Sidebar } from "@/components/Sidebar";
 import { NowPlaying } from "@/components/NowPlaying";
 import { TrackTable } from "@/components/TrackTable";
 import { Waveform } from "@/components/Waveform";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, type Decision, type EditField, type Track } from "@/lib/api";
+import { allFolders, buildTree, folderOf, inFolder, trackMatcher } from "@/lib/folders";
 import { fileName, stem, tildify } from "@/lib/format";
 import { isBoolean, loadPref, savePref } from "@/lib/prefs";
 import { goHome, goTo } from "@/state/app";
 import type { DropTarget } from "@/state/drag";
-import { SEEK_LONG, SEEK_SHORT, useKeymap } from "@/state/keymap";
+import { SEEK_LONG, SEEK_SHORT, keyText, bindingOf, useKeymap, useKeyText } from "@/state/keymap";
 import { showOpenWithMenu, showTrackMenu } from "@/lib/trackMenu";
-import { followTrack, loadTrack, seekBy, stop, togglePlay, usePlayer } from "@/state/player";
+import {
+  TEMPO_STEP,
+  followTrack,
+  loadTrack,
+  nudgeTempo,
+  resetTempo,
+  setTempo,
+  tempoFor,
+  seekBy,
+  stop,
+  toggleKeylock,
+  togglePlay,
+  usePlayer,
+} from "@/state/player";
 import {
   decide,
   editTrack,
   rescan,
   saveSort,
+  setFolder,
   setStartAt,
   startAnalysis,
   undo,
@@ -82,10 +107,78 @@ export function TriageScreen() {
   const trackId = usePlayer((s) => s.trackId);
   const byId = useMemo(() => new Map((tracks ?? []).map((t) => [t.id, t])), [tracks]);
   const current = trackId == null ? null : (byId.get(trackId) ?? null);
+
+  // Fixed tempo (Setup): each track starts at the session's BPM; moving the tempo by hand
+  // only lasts until the next track. Without a known BPM the track plays at 0%.
+  const target = session.targetBpm;
+  const currentBpm = current?.bpm ?? null;
+  const hadTarget = useRef(target != null);
+  useEffect(() => {
+    if (target != null) {
+      if (trackId != null) setTempo(currentBpm == null ? 0 : tempoFor(currentBpm, target));
+    } else if (hadTarget.current) {
+      resetTempo(); // switched off: back to the track's own tempo
+    }
+    hadTarget.current = target != null;
+  }, [trackId, currentBpm, target]);
   const order = useRef<number[]>([]);
+  /** Set when another folder was picked: the list's new order decides where to go. */
+  const jumpInFolder = useRef(false);
   const onOrderChange = useCallback((ids: number[]) => {
     order.current = ids;
+    if (jumpInFolder.current) {
+      jumpInFolder.current = false;
+      selectRef.current?.(ids);
+    }
   }, []);
+  const selectRef = useRef<((ids: number[]) => void) | null>(null);
+
+  // ── Folder tree and search (sidebar) ────────────────────────────────────────────────
+  const keyOf = useKeyText();
+  const root = session.sourcePath;
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [sidebarOpen, setSidebarOpenState] = useState(() =>
+    loadPref("sidebar.open", true, isBoolean),
+  );
+  const setSidebarOpen = useCallback((open: boolean) => {
+    setSidebarOpenState(open);
+    savePref("sidebar.open", open);
+  }, []);
+  const matcher = useMemo(() => trackMatcher(query), [query]);
+  const tree = useMemo(() => buildTree(tracks ?? [], root, matcher ?? undefined), [tracks, root, matcher]);
+  const folders = useMemo(() => allFolders(tree), [tree]);
+  // A remembered folder that is gone (its tracks moved away in Finder) shows everything.
+  const folder =
+    session.folder && folders.some((f) => f.path === session.folder) ? session.folder : null;
+  const folderName = folder ? fileName(folder) : fileName(root);
+  const filter = useMemo(
+    () =>
+      folder || matcher
+        ? (t: Track) => inFolder(folderOf(t, root), folder) && (!matcher || matcher(t))
+        : null,
+    [folder, matcher, root],
+  );
+
+  /** Shows another folder; the current track stays if it is in there, else the first to do. */
+  const chooseFolder = (next: string | null) => {
+    if (next === folder) return;
+    setFolder(next);
+    const cur = current && inFolder(folderOf(current, root), next);
+    if (!cur) jumpInFolder.current = true;
+  };
+  const stepFolder = (dir: 1 | -1) => {
+    const i = folders.findIndex((f) => f.path === (folder ?? ""));
+    const next = folders[i + dir];
+    if (next) chooseFolder(next.path || null);
+  };
+  const focusSearch = () => {
+    setSidebarOpen(true);
+    requestAnimationFrame(() => {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    });
+  };
 
   /**
    * Makes `track` current. Keeps playing if something was playing, unless told otherwise.
@@ -107,6 +200,13 @@ export function TriageScreen() {
     },
     [session.id, session.startAt],
   );
+
+  selectRef.current = (ids: number[]) => {
+    const all = new Map((useSession.getState().tracks ?? []).map((t) => [t.id, t]));
+    const pick =
+      ids.map((id) => all.get(id)).find((t) => t?.status === "pending") ?? all.get(ids[0]);
+    if (pick) select(pick);
+  };
 
   const step = (dir: 1 | -1) => {
     const ids = order.current;
@@ -151,7 +251,7 @@ export function TriageScreen() {
         setNotice(
           outcome.kind === "copy"
             ? `Already in ${where} – not copied again.`
-            : `Already in ${where} – not moved again; this copy went to the Trash (⌘Z brings it back).`,
+            : `Already in ${where} – not moved again; this copy went to the Trash (${keyText(bindingOf("undo"))} brings it back).`,
           "warning",
         );
       } else if (outcome.renamedTo != null) {
@@ -167,7 +267,19 @@ export function TriageScreen() {
       if (next) select(next, session.autoNext);
       else {
         stop();
-        if (!warning) setNotice("All tracks done.");
+        // The last track is done: the Summary (unless a warning needs reading first).
+        if (warning) return;
+        if (useSession.getState().tracks?.some((t) => t.status === "pending")) {
+          setNotice(
+            matcher
+              ? "No more matches to do – clear the search for the rest."
+              : folder
+                ? `“${folderName}” is done – ${keyOf("nextFolder")} goes to the next folder.`
+                : "All tracks done.",
+          );
+        } else {
+          goTo("summary");
+        }
       }
     } catch (e) {
       setNotice(String(e), "warning");
@@ -256,6 +368,10 @@ export function TriageScreen() {
     seekForward: () => seekBy(SEEK_SHORT),
     seekBackLong: () => seekBy(-SEEK_LONG),
     seekForwardLong: () => seekBy(SEEK_LONG),
+    tempoDown: () => nudgeTempo(-TEMPO_STEP),
+    tempoUp: () => nudgeTempo(TEMPO_STEP),
+    tempoReset: resetTempo,
+    keylock: toggleKeylock,
     prevTrack: () => step(-1),
     nextTrack: () => step(1),
     keep: () => void act({ kind: "keep" }, null),
@@ -265,6 +381,10 @@ export function TriageScreen() {
     undo: () => void undoLast(),
     reveal,
     shortcuts: () => setShortcutsOpen(true),
+    prevFolder: () => stepFolder(-1),
+    nextFolder: () => stepFolder(1),
+    toggleSidebar: () => setSidebarOpen(!sidebarOpen),
+    search: focusSearch,
   });
 
   // Resume where the session was left, else the first track still to do. Loaded paused:
@@ -318,7 +438,7 @@ export function TriageScreen() {
 
   return (
     <main className="flex h-full flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
+      <header className="chassis flex h-12 shrink-0 items-center gap-3 px-3">
         <Button variant="ghost" size="icon-sm" onClick={goHome} title="Back to start">
           <ChevronLeft />
         </Button>
@@ -365,10 +485,19 @@ export function TriageScreen() {
         >
           <RefreshCw className={scanning ? "animate-spin" : undefined} />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={() => goTo("summary")}
+          title="Summary – what went where, Undo session"
+        >
+          <ClipboardCheck />
+        </Button>
         <Button variant="ghost" size="sm" onClick={() => goTo("setup")} title="Session setup">
           <SlidersHorizontal data-icon="inline-start" />
           Setup
         </Button>
+        <ThemeToggle />
       </header>
 
       <div className="h-0.5 shrink-0">
@@ -391,37 +520,83 @@ export function TriageScreen() {
 
       {error && <p className="px-4 py-2 text-sm text-destructive">{error}</p>}
 
-      {tracks && tracks.length > 0 ? (
-        <TrackTable
-          tracks={tracks}
-          currentId={trackId}
-          onSelect={(t) => select(t)}
-          onActivate={(t) => select(t, true)}
-          onOrderChange={onOrderChange}
-          initialSort={session.sort}
-          onSortChange={saveSort}
-          onEdit={onEdit}
-          onDropTrack={onDropTrack}
-          hideDone={hideDone}
-          onShowDone={() => setHideDone(false)}
-          onContextMenu={(t) =>
-            void showTrackMenu(session.id, t, {
-              onPlay: () => select(t, true),
-              onSetBpm: (value) => onEdit(t, "bpm", value),
-              onError: showError,
-            })
-          }
-        />
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
-          {tracks && !scanning && (
-            <>
-              <p>No audio files in this folder.</p>
-              {!session.includeSub && <p>Turn on Include subfolders in Setup to look deeper.</p>}
-            </>
+      <div className="flex min-h-0 flex-1">
+        {tracks && tracks.length > 0 && (
+          <Sidebar
+            sessionId={session.id}
+            tree={tree}
+            selected={folder}
+            onSelect={chooseFolder}
+            query={query}
+            onQueryChange={setQuery}
+            onSearchEnter={() => {
+              const first = byId.get(order.current[0]);
+              if (first) select(first, true);
+            }}
+            searchRef={searchRef}
+            open={sidebarOpen}
+            onOpenChange={setSidebarOpen}
+          />
+        )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {tracks && tracks.length > 0 ? (
+            <TrackTable
+              filter={filter}
+              empty={
+                matcher ? (
+                  <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
+                    <p>
+                      No tracks match “{query.trim()}”{folder ? ` in “${folderName}”` : ""}.
+                    </p>
+                    {folder && (
+                      <button
+                        type="button"
+                        onClick={() => chooseFolder(null)}
+                        className="text-xs text-brand hover:underline"
+                      >
+                        Search all folders
+                      </button>
+                    )}
+                  </div>
+                ) : folder && hideDone ? (
+                  <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
+                    <p>Everything in “{folderName}” is done.</p>
+                    <button
+                      type="button"
+                      onClick={() => setHideDone(false)}
+                      className="text-xs text-brand hover:underline"
+                    >
+                      Show done tracks
+                    </button>
+                  </div>
+                ) : undefined
+              }
+              tracks={tracks}
+              currentId={trackId}
+              onSelect={(t) => select(t)}
+              onActivate={(t) => select(t, true)}
+              onOrderChange={onOrderChange}
+              initialSort={session.sort}
+              onSortChange={saveSort}
+              onEdit={onEdit}
+              onDropTrack={onDropTrack}
+              hideDone={hideDone}
+              onShowDone={() => setHideDone(false)}
+              onContextMenu={(t) =>
+                void showTrackMenu(session.id, t, {
+                  onPlay: () => select(t, true),
+                  onSetBpm: (value) => onEdit(t, "bpm", value),
+                  onError: showError,
+                })
+              }
+            />
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+              {tracks && !scanning && <p>No audio files in this folder or its subfolders.</p>}
+            </div>
           )}
         </div>
-      )}
+      </div>
 
       <DestinationBar
         destinations={destinations}

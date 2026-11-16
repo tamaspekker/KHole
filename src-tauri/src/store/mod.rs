@@ -6,6 +6,7 @@ pub mod analysis;
 pub mod destinations;
 pub mod peaks;
 pub mod sessions;
+pub mod settings;
 pub mod tracks;
 
 use std::path::Path;
@@ -30,6 +31,9 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0009_bpm_overrides.sql"),
     include_str!("migrations/0010_bpm_range.sql"),
     include_str!("migrations/0011_session_sort.sql"),
+    include_str!("migrations/0012_settings.sql"),
+    include_str!("migrations/0013_session_folder.sql"),
+    include_str!("migrations/0014_session_target_bpm.sql"),
 ];
 
 /// Timestamps in the DB are Unix milliseconds.
@@ -114,6 +118,7 @@ mod tests {
                 "destinations",
                 "peaks_cache",
                 "sessions",
+                "settings",
                 "tracks"
             ]
         );

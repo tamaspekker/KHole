@@ -293,6 +293,59 @@ pub fn undo_last(store: &Store, session_id: i64) -> Result<Option<Undone>> {
     }))
 }
 
+/// The result of Undo session.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionUndone {
+    /// Actions reverted.
+    pub undone: usize,
+    /// Actions that were open when it started.
+    pub total: usize,
+    /// What did not go back exactly, one line per track (`name: note`).
+    pub notes: Vec<String>,
+    /// It stopped here: this action could not be undone; the older ones stay as they are.
+    pub error: Option<String>,
+}
+
+/// Undo session: reverts every open action of the session, newest first, exactly as ⌘Z
+/// pressed until nothing is left (edits included, so a moved-then-renamed track still goes
+/// back). Stops at the first action that cannot be undone. `progress(done, total)` follows.
+pub fn undo_session(
+    store: &Store,
+    session_id: i64,
+    mut progress: impl FnMut(usize, usize),
+) -> Result<SessionUndone> {
+    let total = actions::stats(&*store.conn()?, session_id)?.open as usize;
+    let mut out = SessionUndone {
+        undone: 0,
+        total,
+        notes: Vec::new(),
+        error: None,
+    };
+    // Only what was open at the start: never more steps than that.
+    while out.undone < total {
+        match undo_last(store, session_id) {
+            Ok(Some(undone)) => {
+                out.undone += 1;
+                if let Some(note) = undone.note {
+                    let name = Path::new(&undone.track.path)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or(undone.track.path);
+                    out.notes.push(format!("{name}: {note}"));
+                }
+                progress(out.undone, total);
+            }
+            Ok(None) => break,
+            Err(e) => {
+                out.error = Some(e.to_string());
+                break;
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// The track's file is at its original place again (put back by hand).
 fn is_back(store: &Store, track_id: i64, src: &Path) -> bool {
     let Ok(key) = store.conn().and_then(|c| tracks::file_key(&c, track_id)) else {
@@ -388,12 +441,15 @@ mod tests {
         assert!(!Path::new(&a.path).exists());
         assert_eq!(out.renamed_to, None);
         assert_eq!(f.count(), 1);
+        // The folder tree still files it under the source folder.
+        assert_eq!(out.track.home_path, a.path);
 
         // A moved track cannot be decided again; its file is no longer in the source.
         assert!(matches!(f.sort(a.id), Err(Error::Invalid(_))));
 
         let undone = undo_last(&f.store, f.session).unwrap().unwrap();
         assert_eq!(undone.track.path, a.path);
+        assert_eq!(undone.track.home_path, a.path);
         assert_eq!(undone.track.status, "pending");
         assert_eq!(undone.note, None);
         assert_eq!(std::fs::read_to_string(&a.path).unwrap(), "a.wav");
@@ -757,6 +813,53 @@ mod tests {
         undo_last(&f.store, f.session).unwrap().unwrap();
         assert!(Path::new(&a.path).exists());
         assert!(f.dst.path().join("a.wav").exists());
+    }
+
+    #[test]
+    fn undo_session_reverts_everything_newest_first() {
+        let f = fixture();
+        let (a, b) = (f.track("a.wav"), f.track("b.wav"));
+        f.sort(a.id).unwrap();
+        decide(&f.store, f.session, b.id, Decision::Keep).unwrap();
+        let mut seen = Vec::new();
+        let out = undo_session(&f.store, f.session, |d, t| seen.push((d, t))).unwrap();
+        assert_eq!((out.undone, out.total, out.error), (2, 2, None));
+        assert_eq!(seen, [(1, 2), (2, 2)]);
+        assert!(out.notes.is_empty());
+        assert_eq!(f.track("a.wav").status, "pending");
+        assert_eq!(f.track("b.wav").status, "pending");
+        assert_eq!(std::fs::read_to_string(&a.path).unwrap(), "a.wav");
+        assert_eq!(f.count(), 0);
+        // Nothing left: a second run does nothing.
+        let again = undo_session(&f.store, f.session, |_, _| {}).unwrap();
+        assert_eq!((again.undone, again.total), (0, 0));
+    }
+
+    #[test]
+    fn undo_session_stops_at_an_action_it_cannot_undo() {
+        let f = fixture();
+        let (a, b) = (f.track("a.wav"), f.track("b.wav"));
+        f.sort(a.id).unwrap();
+        decide(&f.store, f.session, b.id, Decision::Keep).unwrap();
+        // The source folder is gone: the move cannot go back.
+        let src = f.src.path().canonicalize().unwrap();
+        let away = src.with_extension("away");
+        std::fs::rename(&src, &away).unwrap();
+        let out = undo_session(&f.store, f.session, |_, _| {}).unwrap();
+        std::fs::rename(&away, &src).unwrap();
+        assert_eq!((out.undone, out.total), (1, 2));
+        assert!(out.error.is_some());
+        assert_eq!(f.track("b.wav").status, "pending");
+        // The move is still in the log, ⌘Z can retry it.
+        assert_eq!(f.track("a.wav").status, "moved");
+        assert_eq!(
+            undo_last(&f.store, f.session)
+                .unwrap()
+                .unwrap()
+                .track
+                .status,
+            "pending"
+        );
     }
 
     #[test]

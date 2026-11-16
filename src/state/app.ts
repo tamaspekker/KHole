@@ -2,8 +2,8 @@ import { create } from "zustand";
 import { api } from "@/lib/api";
 import { closeSession, openSession } from "@/state/session";
 
-/** Start → Setup → Triage. The open session itself lives in `state/session`. */
-export type Screen = "start" | "setup" | "triage";
+/** Start → Setup → Triage → Summary. The open session itself lives in `state/session`. */
+export type Screen = "start" | "setup" | "triage" | "summary";
 
 interface AppState {
   screen: Screen;

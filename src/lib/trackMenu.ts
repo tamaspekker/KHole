@@ -1,6 +1,7 @@
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { Menu, type MenuItemOptions, type SubmenuOptions } from "@tauri-apps/api/menu";
 import { api, type Track } from "@/lib/api";
+import { accelerator } from "@/state/keymap";
 
 /**
  * Native macOS menus for a track: the list's right-click menu and the "Open in…" button.
@@ -52,7 +53,7 @@ export async function showTrackMenu(
       { item: "Separator" },
       {
         text: "Reveal in Finder",
-        accelerator: "CmdOrCtrl+R",
+        accelerator: accelerator("reveal"),
         enabled: !gone,
         action: () =>
           void api.revealTrack(sessionId, track.id).catch((e) => onError(String(e))),

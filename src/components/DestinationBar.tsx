@@ -3,6 +3,7 @@ import type { Destination } from "@/lib/api";
 import { fileName } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useDrag } from "@/state/drag";
+import { useKeyText } from "@/state/keymap";
 
 /** Which tile to flash; `n` changes on every use so the same tile can flash again. */
 export interface Flash {
@@ -47,6 +48,7 @@ export function DestinationBar({
   onTrash,
   onMoveTo,
 }: Props) {
+  const keyOf = useKeyText();
   const dragging = useDrag((s) => s.track != null);
   const over = useDrag((s) => s.over);
   const keyed = destinations.filter((d) => d.hotkey != null);
@@ -55,7 +57,7 @@ export function DestinationBar({
     unkeyed.some((d) => d.id === tile);
 
   return (
-    <footer className="flex shrink-0 flex-col border-t border-border">
+    <footer className="flex shrink-0 flex-col border-t border-border bg-panel-header">
       {notice?.tone === "warning" ? (
         <div
           role="alert"
@@ -70,8 +72,8 @@ export function DestinationBar({
         <div className="flex h-10 items-center gap-2 px-3 text-[11px] text-muted-foreground">
           <span>
             {destinations.length === 0
-              ? "No destinations – cleanup mode: Enter keeps, Backspace trashes"
-              : `${mode === "copy" ? "Copying" : "Moving"} · 1–0 sorts · M finds a folder · Enter keeps · Backspace trashes · ⌘Z undoes · ? all keys`}
+              ? `No destinations – cleanup mode: ${keyOf("keep")} keeps, ${keyOf("trash")} trashes`
+              : `${mode === "copy" ? "Copying" : "Moving"} · 1–0 sorts · ${keyOf("moveTo")} finds a folder · ${keyOf("keep")} keeps · ${keyOf("trash")} trashes · ${keyOf("undo")} undoes · ${keyOf("shortcuts")} all keys`}
           </span>
           {notice && (
             <span className="ml-auto truncate text-foreground" role="status">
@@ -94,7 +96,7 @@ export function DestinationBar({
             flashKey={flash?.tile === d.id ? flash.n : null}
             warning={!!flash?.warning}
           >
-            <kbd className="tabular flex size-5 shrink-0 items-center justify-center rounded bg-muted text-xs font-semibold">
+            <kbd className="tabular flex size-5 shrink-0 items-center justify-center rounded-sm bg-background/70 text-[11px] font-semibold text-foreground/80">
               {d.hotkey ?? "·"}
             </kbd>
             <span className={cn("min-w-0 flex-1 truncate", !d.available && "line-through")}>
@@ -109,7 +111,7 @@ export function DestinationBar({
         ))}
         {unkeyed.length > 0 && (
           <Tile
-            title={`Move to… – ${unkeyed.length} more ${unkeyed.length === 1 ? "folder" : "folders"} without a number key (M)`}
+            title={`Move to… – ${unkeyed.length} more ${unkeyed.length === 1 ? "folder" : "folders"} without a number key (${keyOf("moveTo")})`}
             drop="moveTo"
             dragging={dragging}
             over={over === "moveTo"}
@@ -118,8 +120,8 @@ export function DestinationBar({
             flashKey={isUnkeyed(flash?.tile) ? flash!.n : null}
             warning={!!flash?.warning}
           >
-            <kbd className="flex size-5 shrink-0 items-center justify-center rounded bg-muted text-xs font-semibold">
-              M
+            <kbd className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-background/70 text-[11px] font-semibold text-foreground/80">
+              {keyOf("moveTo")}
             </kbd>
             <span className="min-w-0 flex-1 truncate">Move to…</span>
             <span className="tabular shrink-0 text-xs text-muted-foreground">
@@ -128,7 +130,7 @@ export function DestinationBar({
           </Tile>
         )}
         <Tile
-          title="Move to Trash (Backspace)"
+          title={`Move to Trash (${keyOf("trash")})`}
           drop="trash"
           dragging={dragging}
           over={over === "trash"}
@@ -185,13 +187,13 @@ function Tile({
       // Keys belong to the keymap; a focused tile must not turn Space or Enter into a click.
       tabIndex={-1}
       className={cn(
-        "relative flex h-10 w-44 shrink-0 items-center gap-2 overflow-hidden rounded-lg border bg-card px-2.5 text-left text-sm",
+        "relative flex h-10 w-44 shrink-0 items-center gap-2 overflow-hidden rounded-md border bg-card px-2.5 text-left text-sm transition-colors",
         over
           ? "border-brand bg-brand/20"
           : dragging
             ? "border-dashed border-muted-foreground/60"
             : active
-              ? "border-brand"
+              ? "border-orange"
               : "border-border hover:bg-accent/60",
         unavailable && "opacity-50",
         className,

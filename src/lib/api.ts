@@ -18,7 +18,6 @@ export interface AnalyzerInfo {
 export interface Session {
   id: number;
   sourcePath: string;
-  includeSub: boolean;
   mode: "move" | "copy";
   startAt: number;
   autoNext: boolean;
@@ -27,6 +26,10 @@ export interface Session {
   bpmMin: number | null;
   /** The track list's sort order (TanStack sorting state as JSON); null: folder order. */
   sort: string | null;
+  /** The subfolder the list shows (folder tree), relative to the source; null: all. */
+  folder: string | null;
+  /** Fixed preview tempo: every track plays at this BPM (within ±16 %); null: off. */
+  targetBpm: number | null;
 }
 
 export interface RecentSession {
@@ -59,6 +62,8 @@ export interface Track {
   bpmSource: "manual" | "tag" | "analysis" | null;
   /** The key comes from KHole's analysis (the tags have none). */
   keyAnalyzed: boolean;
+  /** Where the file is, or was before it was moved / trashed, inside the source folder. */
+  homePath: string;
 }
 
 export interface Destination {
@@ -103,6 +108,36 @@ export interface Undone {
   destinationId: number | null;
   /** Something did not go back exactly (name taken, file gone meanwhile, …). */
   note: string | null;
+}
+
+/** What the Summary shows from the undo log. */
+export interface SessionStats {
+  /** Actions ⌘Z / Undo session can still revert. */
+  open: number;
+  /** Of those, edits from the list (rename, tag, BPM). */
+  openEdits: number;
+  /** Working time (ms) between actions, breaks over 5 minutes left out. */
+  activeMs: number;
+  /** Unix ms. */
+  firstTs: number | null;
+  lastTs: number | null;
+}
+
+/** The result of Undo session. */
+export interface SessionUndone {
+  undone: number;
+  /** Actions open when it started. */
+  total: number;
+  /** What did not go back exactly, one line per track. */
+  notes: string[];
+  /** It stopped at an action that could not be undone; older ones are unchanged. */
+  error: string | null;
+}
+
+export interface UndoProgress {
+  sessionId: number;
+  done: number;
+  total: number;
 }
 
 export interface ScanSummary {
@@ -186,12 +221,14 @@ export const api = {
   locateSession: (sessionId: number) => invoke<Session | null>("locate_session", { sessionId }),
   setSort: (sessionId: number, sort: string | null) =>
     invoke<Session>("set_sort", { sessionId, sort }),
-  setIncludeSubfolders: (sessionId: number, value: boolean) =>
-    invoke<Session>("set_include_subfolders", { sessionId, value }),
+  setFolder: (sessionId: number, folder: string | null) =>
+    invoke<Session>("set_folder", { sessionId, folder }),
   listTracks: (sessionId: number) => invoke<Track[]>("list_tracks", { sessionId }),
   scanSession: (sessionId: number) => invoke<ScanSummary>("scan_session", { sessionId }),
   setStartAt: (sessionId: number, value: number) =>
     invoke<Session>("set_start_at", { sessionId, value }),
+  setTargetBpm: (sessionId: number, value: number | null) =>
+    invoke<Session>("set_target_bpm", { sessionId, value }),
   setCurrentTrack: (sessionId: number, trackId: number | null) =>
     invoke<null>("set_current_track", { sessionId, trackId }),
   setMode: (sessionId: number, mode: Session["mode"]) =>
@@ -213,6 +250,15 @@ export const api = {
   decide: (sessionId: number, trackId: number, decision: Decision) =>
     invoke<Outcome>("decide", { sessionId, trackId, decision }),
   undo: (sessionId: number) => invoke<Undone | null>("undo", { sessionId }),
+  undoSession: (sessionId: number) => invoke<SessionUndone>("undo_session", { sessionId }),
+  sessionStats: (sessionId: number) => invoke<SessionStats>("session_stats", { sessionId }),
+  openDestination: (sessionId: number, destinationId: number) =>
+    invoke<null>("open_destination", { sessionId, destinationId }),
+
+  /** App-wide preferences (JSON text); null: not set. */
+  getSetting: (key: "keymap") => invoke<string | null>("get_setting", { key }),
+  setSetting: (key: "keymap", value: string | null) =>
+    invoke<null>("set_setting", { key, value }),
 
   watchSession: (sessionId: number) => invoke<null>("watch_session", { sessionId }),
   unwatchSession: () => invoke<null>("unwatch_session"),
@@ -235,6 +281,8 @@ export const events = {
     listen<ScanProgress>("scan_progress", (e) => cb(e.payload)),
   onAnalysisProgress: (cb: (p: AnalysisProgress) => void): Promise<UnlistenFn> =>
     listen<AnalysisProgress>("analysis_progress", (e) => cb(e.payload)),
+  onUndoProgress: (cb: (p: UndoProgress) => void): Promise<UnlistenFn> =>
+    listen<UndoProgress>("undo_progress", (e) => cb(e.payload)),
   /** Something changed in the session's folder outside the app (Finder). */
   onFolderChanged: (cb: (p: FolderChanged) => void): Promise<UnlistenFn> =>
     listen<FolderChanged>("folder_changed", (e) => cb(e.payload)),

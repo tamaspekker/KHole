@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { ChevronLeft, FolderPlus, Play, X } from "lucide-react";
 import { START_AT_OPTIONS, Segmented } from "@/components/Segmented";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Switch } from "@/components/ui/switch";
 import type { Destination } from "@/lib/api";
+import { allFolders, buildTree } from "@/lib/folders";
 import { fileName, parentPath, tildify } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { goHome, goTo } from "@/state/app";
@@ -13,11 +15,12 @@ import {
   setAutoNext,
   setBpmRange,
   setDestinationHotkey,
-  setIncludeSub,
   setMode,
   setStartAt,
+  setTargetBpm,
   useSession,
 } from "@/state/session";
+import { useKeyText } from "@/state/keymap";
 
 const HOTKEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
 
@@ -35,6 +38,7 @@ const MODE_OPTIONS = [
  */
 export function SetupScreen() {
   const session = useSession((s) => s.session)!;
+  const keyOf = useKeyText();
   const tracks = useSession((s) => s.tracks);
   const progress = useSession((s) => s.progress);
   const destinations = useSession((s) => s.destinations);
@@ -43,6 +47,10 @@ export function SetupScreen() {
   const analysisError = useSession((s) => s.analysisError);
 
   const count = tracks?.length ?? 0;
+  const folders = useMemo(
+    () => (tracks ? allFolders(buildTree(tracks, session.sourcePath)).length - 1 : 0),
+    [tracks, session.sourcePath],
+  );
   const left = tracks?.filter((t) => t.status === "pending").length ?? 0;
   const trackLabel = progress
     ? progress.total > 0
@@ -54,11 +62,12 @@ export function SetupScreen() {
 
   return (
     <main className="flex h-full flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
+      <header className="chassis flex h-12 shrink-0 items-center gap-3 px-3">
         <Button variant="ghost" size="icon-sm" onClick={goHome} title="Back to start">
           <ChevronLeft />
         </Button>
         <h1 className="flex-1 text-sm font-semibold">Session setup</h1>
+        <ThemeToggle />
       </header>
 
       <div className="min-h-0 flex-1 overflow-auto">
@@ -90,16 +99,16 @@ export function SetupScreen() {
                 />
               </div>
             )}
-            <Row>
-              <label htmlFor="include-sub" className="flex-1 text-sm">
-                Include subfolders
-              </label>
-              <Switch
-                id="include-sub"
-                checked={session.includeSub}
-                onCheckedChange={(v) => void setIncludeSub(v)}
-              />
-            </Row>
+            {folders > 0 && (
+              <Row>
+                <span className="flex-1 text-sm">
+                  {folders} {folders === 1 ? "subfolder" : "subfolders"}, all included
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Pick one in the sidebar while sorting
+                </span>
+              </Row>
+            )}
           </Section>
 
           <Section
@@ -139,6 +148,7 @@ export function SetupScreen() {
                 onChange={(v) => void setStartAt(v)}
               />
             </Row>
+            <FixedTempoRow value={session.targetBpm} />
             <Row>
               <label htmlFor="auto-next" className="flex-1 text-sm">
                 Auto-play next track after a decision
@@ -186,11 +196,11 @@ export function SetupScreen() {
         </div>
       </div>
 
-      <footer className="flex h-14 shrink-0 items-center justify-end gap-3 border-t border-border px-4">
+      <footer className="flex h-14 shrink-0 items-center justify-end gap-3 border-t border-border bg-panel-header px-4">
         <span className="text-xs text-muted-foreground">
           {destinations.length > 0
-            ? "1–0 sorts · Backspace trashes · Enter keeps"
-            : "Backspace trashes · Enter keeps"}
+            ? `1–0 sorts · ${keyOf("trash")} trashes · ${keyOf("keep")} keeps`
+            : `${keyOf("trash")} trashes · ${keyOf("keep")} keeps`}
         </span>
         <Button autoFocus onClick={() => goTo("triage")}>
           <Play data-icon="inline-start" />
@@ -220,6 +230,61 @@ function Section({
         {children}
       </div>
     </section>
+  );
+}
+
+/** Default when Fixed tempo is switched on for the first time. */
+const DEFAULT_TARGET_BPM = 125;
+
+/**
+ * Fixed tempo: every track previews at one BPM (within ±16 %); the tempo can still be moved
+ * per track in the triage. The field applies on Enter or when it is left.
+ */
+function FixedTempoRow({ value }: { value: number | null }) {
+  // The last value, so switching off and on again brings it back.
+  const [last, setLast] = useState(value ?? DEFAULT_TARGET_BPM);
+  const [draft, setDraft] = useState<string | null>(null);
+  const on = value != null;
+
+  const commit = (text: string) => {
+    setDraft(null);
+    const v = Number(text.trim().replace(",", "."));
+    if (!Number.isFinite(v) || v < 40 || v > 300 || v === value) return;
+    setLast(v);
+    void setTargetBpm(v);
+  };
+
+  return (
+    <Row>
+      <label htmlFor="fixed-tempo" className="flex-1 text-sm">
+        Fixed tempo
+        <span className="block text-xs text-muted-foreground">
+          Every track previews at this BPM (within ±16%). You can still change it per track.
+        </span>
+      </label>
+      <input
+        aria-label="Fixed tempo in BPM"
+        inputMode="decimal"
+        disabled={!on}
+        value={draft ?? String(on ? value : last)}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          else if (e.key === "Escape") {
+            setDraft(null);
+            e.currentTarget.blur();
+          }
+        }}
+        onBlur={(e) => draft != null && commit(e.currentTarget.value)}
+        className="tabular h-7 w-16 shrink-0 rounded-md border border-border bg-background px-1.5 text-right text-sm disabled:opacity-50"
+      />
+      <span className="text-xs text-muted-foreground">BPM</span>
+      <Switch
+        id="fixed-tempo"
+        checked={on}
+        onCheckedChange={(checked) => void setTargetBpm(checked ? last : null)}
+      />
+    </Row>
   );
 }
 

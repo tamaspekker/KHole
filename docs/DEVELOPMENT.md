@@ -23,7 +23,10 @@ Ez a fájl a fejlesztés egyetlen állapot-forrása: mi kész, mi következik, m
 | M6 Tempó | Destination bar, Move to…, `?` lap, szűrő, oszlopok | ✅ Kész (2026-11-12) |
 | M7 Elemzés | Essentia sidecar a háttérben, progress, cache | ✅ Kész (2026-11-13); nyitva: mérés egy 120–135 BPM-es mappán |
 | M8 Session | Mentés és folytatás, mappánkénti beállítások, új mappa sablonból, Locate…, ablakméret | ✅ Kész (2026-11-14) |
-| v1.1+ | Spec #13–#22 | ⬜ |
+| v1.1 #13–#15 | Mappafa + kereső, hotkeyek átírása, Summary + Undo session | 🟡 Kész, kézi tesztre vár (2026-11-14) |
+| v1.1 #17 | Tempó az előnézetben, keylockkal | 🟡 Kész, kézi tesztre vár (2026-11-15) |
+| Design | Szinti-panel megjelenés, hangerő-poti, tempófader, oszlopszélesség, Fixed tempo | 🟡 Kész, kézi tesztre vár (2026-11-16) |
+| v1.1+ | Spec #16, #18–#22 | ⬜ |
 
 ---
 
@@ -326,6 +329,106 @@ CREATE TABLE peaks_cache (
 
 ---
 
+## v1.1 – Mappafa, hotkeyek és Summary (2026-11-14)
+
+A felhasználó kérése: a spec #14 és #15, utána a #13. A mappafára négy változatot mutattam (klasszikus fa, fa mint szűrő az Include subfolders helyett, csoportosítás a listában, mappaugró kereső); a felhasználó a **B-t** választotta, kiegészítve egy track-keresővel a fa felett és oldalról nyitható / csukható oldalsávval.
+
+**#13 Mappafa + kereső**
+- [x] **Mindig rekurzív scan:** az Include subfolders megszűnt (`0013`: `sessions.include_sub` törölve, új `sessions.folder`, a forráshoz relatív útvonal, `NULL` = minden). A figyelő is mindig az egész fát nézi. A Setupban a kapcsoló helyén: „n subfolders, all included”.
+- [x] **A fa szűrő:** a gyökér a teljes forrásmappa; egy mappa a saját és az almappái trackjeit mutatja. A kiválasztott mappa sessionönként megmarad (`set_folder`, csak sima relatív útvonal: nincs `..`, `.`, abszolút); a sablon nem viszi tovább. Ha a mappa eltűnt, minden látszik.
+- [x] A trackek a **forrásbeli helyük** szerint kerülnek a fába (`Track.homePath`): áthelyezett / kukázott tracknél az undo napló utolsó nyitott move / trash `src`-je, így a kész track is a mappájában marad.
+- [x] Mappánként a hátralévők száma, kész mappánál pipa; természetes rendezés (2 a 10 előtt), kis-nagybetű nem számít. Kibontás / összecsukás mappánként (megmarad, `localStorage`), a kiválasztott mappa szülei maguktól kinyílnak.
+- [x] **Mappaváltás:** a fa sorrendjében ⇧↑ / ⇧↓ (az átírható billentyűk között, új „Folders” szakasz). Váltáskor az aktuális track marad, ha benne van az új mappában, különben az első függő track jön. A döntés utáni következő track a mappán belül marad; a mappa végén „“X” is done – ⇧↓ goes to the next folder.”; a Summary csak akkor nyílik, ha az egész session kész.
+- [x] **Kereső** a fa felett: cím, előadó, fájlnév; minden szónak szerepelnie kell; ékezet és kis-nagybetű nem számít. A kiválasztott mappán belül keres; a fa közben a találatok számát mutatja (találat nélküli mappa halvány); üres eredménynél „Search all folders”. ⌘F a keresőbe ugrik, Enter az első találatot játssza le, Esc töröl (másodszorra kilép), ↓ / Tab vissza a listához.
+- [x] **Oldalsáv:** a lista mellett (a waveform teljes szélességű marad); a szélénél húzva méretezhető (160–420 px), balra húzva becsukódik; becsukva egy keskeny sáv (kinyitás, kereső ikon, jelzőpötty, ha szűrés van), amiből kattintással vagy húzással nyílik. S gomb ki / be. A szélesség és a nyitottság megmarad.
+- [x] Tesztek: `set_folder` (mentés, normalizálás, rossz útvonalak), `homePath` áthelyezés és visszavonás után; a fa / kereső függvényeit egy eldobható Node-szkripttel ellenőriztem (nincs JS tesztkeret). `cargo test` (93), clippy, fmt, typecheck, `vite build` tiszta; a felületet nem láttam.
+
+**#14 Hotkeyek átírása**
+- [x] A `?` lap egyben a beállítás: a billentyűre kattintva „Press a key…”, a következő leütés az új kiosztás, Esc megszakít. **Reset to defaults** gomb.
+- [x] Minden művelet átírható, kivéve az **1–0** célmappa-gombokat (hogy melyik mappa melyik számon van, az a Setupban állítható). ⌘ és ⇧ módosító használható, ⌃ / ⌥ nem.
+- [x] Ütközésnél **csere**: amelyik műveletnél eddig ez a gomb volt, az megkapja a régit, így soha nem marad művelet gomb nélkül. Foglalt: Esc, Tab, a számok módosító nélkül, ⌘Q / W / H / M / , / C / V / X / A / O.
+- [x] Globális beállítás a DB-ben (`0012`, `settings` tábla, `keymap` kulcs, csak az alapértéktől eltérők); betöltéskor az érvénytelen / foglalt / ütköző elem kimarad.
+- [x] A feliratok követik: a destination bar alsó sora, a Trash és a Move to… csempe, a Setup lábléce, a Reveal gomb, a jobb klikkes menü gyorsbillentyűje, a figyelmeztetések.
+
+**#15 Summary + Undo session**
+- [x] Új képernyő (`summary`): az utolsó függő track döntése után magától nyílik (ha nincs elolvasandó figyelmeztetés), és a Triage fejlécéből bármikor (pipás vágólap ikon).
+- [x] Tartalom: „All tracks done” / „n of N done”, munkaidő (az akciók közötti idő, az 5 percnél hosszabb szünetek nélkül) és átlag mp / track; Sorted / Kept / Trashed / Left; célmappánként a szám és **Open in Finder**; a Kuka száma; ha volt, a Finderben eltűnt fájlok száma.
+- [x] **Undo session**: megerősítés után az összes nyitott akció visszavonása, a legújabbtól, pontosan úgy, mint a ⌘Z ismételve (a szerkesztések is, különben egy áthelyezett, majd átnevezett track nem jönne vissza). Progress sáv (`undo_progress`). Ha egy akció nem vonható vissza (pl. eltűnt a forrásmappa), ott megáll, kiírja az okát, a régebbiek érintetlenek, újrapróbálható. A nem pontosan visszakerült fájlok (névütközés stb.) listája.
+- [x] Rust: `actions::stats`, `fileops::undo_session`, commandok: `undo_session`, `session_stats`, `open_destination`, `get_setting`, `set_setting`.
+- [x] Tesztek: `settings`, `stats` (szünet kiszűrése, nyitott szerkesztések), Undo session (minden vissza, sorrend, második futás üres; megállás nem visszavonható akciónál, utána ⌘Z működik), `open_folder` hiányzó mappára. `cargo test` (93), clippy `-D warnings`, `cargo fmt`, typecheck, `vite build` tiszta; a felületet nem láttam.
+- [ ] Kézi teszt (lent).
+
+### Kézi teszt (v1.1 #13–#15)
+**Mappafa és kereső**
+1. Nyiss meg egy mappát, amiben almappák vannak (pl. kiadónként, alattuk még egy szint). A Setupban „n subfolders, all included”; a Triage-ban bal oldalt a fa, a gyökér a forrásmappa, minden track a listában.
+2. Kattints egy almappára → csak az övéi (és az alatta lévők) látszanak, az első függő track töltődik be. Dönts végig rajta: a következő track mindig ebből a mappából jön; a végén „… is done – ⇧↓ goes to the next folder”, a mappa mellett pipa. ⇧↓ → a következő mappa.
+3. Egy áthelyezett / kukázott track a „Hide done” kikapcsolva is a saját mappájában látszik. ⌘Z után is.
+4. Lépj vissza a Startra, nyisd meg újra → ugyanaz a mappa van kiválasztva, a becsukott mappák csukva.
+5. **Kereső:** ⌘F → a kereső fókuszban; írj be egy előadónevet ékezet nélkül → a lista szűrve, a fában a találatok száma. Enter → az első találat szól. Egy almappán belül nem található névre → „Search all folders”. Esc → törlés.
+6. **Oldalsáv:** húzd a szélét → méreteződik; húzd balra → becsukódik, keskeny sáv marad; kattints a sávra vagy húzd jobbra → kinyílik. S → ki / be. Újraindítás után ugyanúgy.
+
+**Hotkeyek és Summary**
+1. `npm run tauri dev`, nyiss meg egy sessiont. **?** → kattints a „Move to Trash” melletti `Backspace`-re → „Press a key…” → nyomd meg a **D**-t. A lap alján nincs üzenet; zárd be: a destination bar alsó sora „D trashes”, a Trash csempe tooltipje „(D)”. A D Kukába dob, a Backspace már nem.
+2. **Csere:** a `?` lapon add a Keep-nek a **D**-t → „Swapped with “Move to Trash…””, a Trash visszakapja az Entert. Esc felvétel közben csak a felvételt szakítja meg, a lapot nem zárja be.
+3. **Foglalt:** próbáld az **1**-et, az **Esc**-et vagy a ⌘Q-t → borostyán magyarázat, semmi nem változik. ⌥ + betű → „not used”.
+4. **Megmarad:** lépj ki (⌘Q), indítsd újra → a saját kiosztás él. **Reset to defaults** → minden az eredeti.
+5. **Summary:** egy kis mappán (3–4 track) dönts mindegyikről (célmappa, Keep, Kuka vegyesen) → az utolsó után magától a Summary jön: számok, munkaidő, célmappánként a szám; a mappa ikonja Finderben megnyitja a célmappát.
+6. **Undo session:** nyomd meg → megerősítés (hány döntés, hány szerkesztés) → Undo session → a fájlok visszakerülnek a forrásba (Copy módban a másolatok a Kukába), a Left = az összes, a gomb kiszürkül. Vissza a Triage-ba: minden track függő, a lista rendben.
+7. A Triage fejlécében a pipás vágólap ikon menet közben is megnyitja a Summaryt („n of N done”); a bal felső nyíl visszavisz a trackekhez.
+
+## v1.1 – Tempó az előnézetben, keylockkal (#17, 2026-11-15)
+
+- [x] A tempót a WebView `<audio>` eleme állítja: `playbackRate` + `preservesPitch` (és a régebbi WebKit miatt a `webkitPreservesPitch` is). A keylock be = time-stretch, a hangnem marad; ki = varispeed, a hangmagasság követi a tempót. Nincs Rust-oldali dekódolás, nincs új függőség.
+- [x] ±16%, 0,1%-os pontossággal. A tempó a trackváltáskor megmarad (mint egy pitch fader), újraindításkor 0%. A keylock alapból be van kapcsolva, és megmarad (`localStorage`, `khole.keylock`).
+- [x] Új forrás betöltésekor a böngésző a `playbackRate`-et visszaállítja a `defaultPlaybackRate`-re, ezért mindkettőt beállítjuk, és a `loadTrack` / `followTrack` után újra alkalmazzuk.
+- [x] **NowPlaying sor:** az óra mellett `−` / `+0.0%` / `+` és egy lakat ikon. A százalékra kattintva 0%, fölötte görgetve 0,1%-os finomhangolás (a trackpad apró lépései összeadódnak, 40 px = 0,1%). A tényeknél eltolt tempónál `124 → 127.1 BPM`.
+- [x] **Billentyűk** (Playback szakasz, mind átírható): `,` / `.` = −/+ 0,5% (nyomva tartva ismétel), `T` = 0%, `K` = keylock ki / be. A `,` és a `.` a magyar kiosztáson is ugyanott van; Shift-es változat nincs, mert sok kiosztáson a Shift más karaktert ad.
+- [x] `npm run typecheck`, `vite build` tiszta (Rust nem változott); a felületet nem láttam.
+- [ ] Kézi teszt (lent), köztük a WebKit time-stretch minőségének meghallgatása.
+
+### Kézi teszt (v1.1 #17)
+1. `npm run tauri dev`, nyiss meg egy sessiont, indíts el egy ismert BPM-ű tracket.
+2. Nyomd meg néhányszor a `.`-ot → gyorsul, a sorban `+1.5%`, a tényeknél pl. `124 → 125.9 BPM`; a hangnem nem változik. A `,` lassít, nyomva tartva folyamatosan.
+3. `K` → a lakat kinyílik; most a tempóval a hangmagasság is változik (mint egy lemezjátszón). `K` újra → vissza.
+4. Görgess a százalék fölött (egér és trackpad) → 0,1%-onként változik, nem ugrik nagyokat. Kattints a százalékra (vagy `T`) → 0%.
+5. Állítsd +3%-ra, válts tracket (↓ vagy egy döntéssel) → a következő is +3%-on szól. Kattintás és ugrás a waveformon rendben van, a lejátszófej a track idejét követi.
+6. Kapcsold ki a keylockot, lépj ki (⌘Q) és indítsd újra → a keylock ki marad, a tempó 0%.
+7. Hallgasd meg a minőséget ±6% körül és ±16%-on is: ha a time-stretch hallhatóan gyenge, a Rubber Band (Rust oldali lejátszás) jöhet szóba.
+
+## Design – szinti-panel megjelenés (2026-11-16)
+
+Irány: Native Instruments Massive XL-szerű hardveres panel, visszafogottan (a felhasználó második körös kérése: ne legyen „AI-s”, csicsás).
+
+- [x] Paletta (`src/index.css`): sötétben semleges grafit panelek; a fő szín (`--primary`, fókusz) **levendula** (Import Folder lila); a **narancs** (`--orange`) csak állapotjelző: az utoljára használt célcsempe kerete és a bekapcsolt keylock. Funkciószínek: `--tech-cyan` (hangerő), `--tech-green` (tempó, ha nem 0), `--tech-pink` tartalék. Új tokenek: `--knob`, `--knob-cap`, `--panel-header`; `--radius` 0.375rem. Világos módban ugyanez világos alapon.
+- [x] `.panel-label` (csendes modulfelirat), `.chassis` (sötétebb fejlécsáv); a Triage / Setup / Summary fejléce chassis, a lista fejléce és a láblécek `bg-panel-header`.
+- [x] Gombok semlegesek (nincs narancs keret, nincs ragyogás); a Segmented kiválasztott eleme világos, „Bi/Uni”-szerű.
+- [x] `components/Controls.tsx`: **Knob** (270°-os, vékony színes ív, függőleges húzás, ⇧ finom, görgő, dupla katt = alap) és **Fader** (vízszintes, középső reteszes, 0 körül ±0,4%-on bepattan, görgő, dupla katt = 0). Nem kapnak fókuszt: a nyilak a keymapé.
+- [x] `NowPlaying` modulsáv (h-12, egy sor): kerek Play gomb (lejátszáskor levendula), cím / tények, óra; modulok: **Tempo** (−, fader, +, százalék, keylock), **Volume** (26 px-es cián poti + szám), **File** (Finder, Open in… – csak ikonok), **Start at**.
+- [x] Hangerő: `player.volume` (0…1), `audio.volume = v²`, `localStorage`-ban (`khole.volume`).
+- [x] **Oszlopszélesség** (`TrackTable`): a fejlécben, a címek közti résben vékony elválasztó; húzás (min. 32 px), dupla katt = alap, a fejléc jobb klikkes Resetje is visszaállítja; `khole.columns.widths`. Az átméretezett oszlop px-ben rögzül, a többi rugalmas marad.
+- [x] Görgetősávok: sáv nélkül, 4 px-es áttetsző fogantyú, hoverre erősebb.
+- [x] **Tempó beírással:** a százalékra kattintva mező lesz; ±16-ig százalék, 40–300 között cél-BPM (a track BPM-jéből), Enter / kilépés alkalmaz, Esc mégse. 0%: `T` vagy a fader dupla kattintása.
+- [x] **Fixed tempo** (Setup → Decisions): kapcsoló + BPM-mező; `sessions.target_bpm` (`0014` migráció, `set_target_bpm`, 40–300, két tizedes), az új mappa örökli a sablonsessionből. A Triage minden tracknél a célra állítja a tempót (±16%-on belül, BPM nélkül 0%); trackenként kézzel állítható, a következő track újra a célra áll; kikapcsoláskor 0%.
+
+- [x] **Világos / sötét mód, holdikonnal** (`lib/theme.ts`, `ThemeToggle`): alapból a rendszert követi; a hold (sötétben kitöltve) a másikra vált és megjegyzi (`khole.theme`: system / light / dark – ha a rendszerrel egyezőt választod, újra követi). Minden képernyő fejlécében, a Start képernyőn a jobb felső sarokban. Váltáskor a waveform is újraszíneződik (`khole-theme` esemény).
+- [x] **Natív fejléc színe:** `titleBarStyle: "Transparent"`, így a három gombos léc az ablak háttérszínét mutatja; ezt a JS a téma szerint állítja (`setBackgroundColor` + `setTheme`, új jogosultságok a `capabilities/default.json`-ban). Sötét: **#1E1E1E**, világos: **#F6F6F6** – ugyanez a `--background` és a fejlécek színe, így a natív léc és az app fejléce egy felület.
+- [x] Paletta macOS-szerű semleges szürkékre: sötétben #1E1E1E alap, #262626 panelek; világosban #F6F6F6 alap, fehér panelek. A poti világos módban is látszik (`--knob-edge` perem, sötétebb árok, mélyebb cián); a waveform világosban is levendula.
+
+- [x] Javítások: a waveform idővonala és a hover-címke CSS-változókat kap (a shadow rootba is öröklődnek), így témaváltáskor is helyes a színük; a lista minimális szélessége az oszlopokból számolódik, és ha nem fér ki, az egész lista (fejléc, kijelölés) együtt görget oldalra.
+
+### Kézi teszt (Design)
+1. `npm run tauri dev` → sötét és világos rendszertémában is: Start, Setup, Triage, Summary. Az Import Folder lila, a gombok semlegesek, narancs csak az utoljára használt csempén és a bekapcsolt lakaton.
+2. Tempófader: húzás → zöld kitöltés a középtől, 0 közelében bepattan; dupla katt → 0%. A `,` `.` `T` billentyűk a fadert is mozgatják.
+3. Volume poti: húzd fel/le (⇧-tal finoman), görgess fölötte, dupla katt → 100%. Újraindítás után megmarad.
+4. A nyilak a poti / fader után is trackot váltanak (nem ragad fókusz).
+5. Lista fejléce: a címek közti vonalat húzva az oszlop szélessége változik, közben nem rendez és nem mozgat; dupla katt → alap; újraindítás után megmarad; jobb klikk → Reset.
+6. Görgetősávok: a lista és az oldalsáv sávja vékony, halvány, rámutatva erősödik.
+7. Kattints a tempó százalékára → `2.5` → +2.5%; `128` egy 124 BPM-es tracknél → kb. +3.2%, a tényeknél `124 → 128.0 BPM`; Esc nem változtat.
+8. Setup → Fixed tempo be, 126 → Triage: minden track 126-on szól; kézzel állítva, majd trackváltás után újra 126; BPM nélküli track 0%-on; kikapcsolva 0%. Új mappa megnyitásakor öröklődik.
+9. Holdikon: vált világos ↔ sötét, a natív fejléc (három gomb) színe is vált (#F6F6F6 / #1E1E1E), és egybeolvad az app fejlécével; újraindítás után megmarad. A rendszertéma váltását követi, amíg a rendszerrel egyező módot választottad.
+10. Világos módban a hangerő-poti, a fader és a waveform jól látszik.
+11. Húzz szélesre néhány oszlopot, amíg nem fér ki → vízszintes görgetősáv; a fejléc és a kijelölt sor sávja együtt mozog a cellákkal. Holdváltáskor a waveform alatti időszámok és a hover-idő színe is vált.
+
 ## Architektúra (cél)
 
 ```
@@ -442,7 +545,27 @@ Alapelvek:
 | 2026-11-13 | Ablakméret / -hely: `tauri-plugin-window-state`, csak Rustból | Kész megoldás, nem kell UI-jog |
 | 2026-11-13 | Elérhetetlen célmappa: megmarad a listában (halványan), nem törlődik magától; az ablak fókuszakor újraellenőrizzük | Külső meghajtónál gyakori, hogy épp nincs bedugva; a sablon is így viszi tovább |
 | 2026-11-13 | Locate…: minden tárolt útvonal prefixcseréje egy tranzakcióban (`LIKE` nélkül), az undo napló is | Különben a ⌘Z a régi, nem létező helyre tenne vissza; a mappanév tartalmazhat `%` / `_` jelet |
+| 2026-11-14 | Hotkeyek: a `?` lap a beállítás helye (kattints a billentyűre, nyomd meg az újat); nincs külön Settings ablak | Egy helyen látszik és változik; a billentyűzetes app „beállítása” szinte csak ez |
+| 2026-11-14 | Az 1–0 célmappa-gombok nem írhatók át, a többi művelet igen; ütközésnél csere | A számok a csempéken és a Setupban látszanak, betűre cserélve összezavarna; a csere miatt nincs gomb nélküli művelet |
+| 2026-11-14 | A kiosztás globális, a DB `settings` táblájában (csak az eltérések), nem `localStorage`-ban | Nem nézet-kényelmi beállítás: elvesztése zavaró lenne; a UI validál betöltéskor |
+| 2026-11-14 | Undo session = a ⌘Z ismétlése, amíg van mit (szerkesztések is), az első hibánál megáll | Csak így konzisztens (pl. áthelyezés + átnevezés); a félbeszakadt állapot is érvényes, újrapróbálható |
+| 2026-11-14 | Summary: az utolsó track után magától nyílik, és a fejlécből bármikor; munkaidő az undo naplóból, 5 percnél hosszabb szünet nélkül | A spec folyamata szerint a session végén jön; külön időmérő nem kell |
+| 2026-11-14 | Mappafa: B változat – mindig rekurzív scan, a fa szűrő, az Include subfolders megszűnik | A felhasználó döntése; egy mód kevesebb, a gyökér ugyanazt adja, mint a régi kapcsoló |
+| 2026-11-14 | A kiválasztott mappa a DB-ben (`sessions.folder`, relatív), a nyitott / csukott mappák és az oldalsáv mérete `localStorage`-ban | A mappa session-adat (folytatáskor kell); a többi nézet-kényelem |
+| 2026-11-14 | A track a forrásbeli helye szerint kerül a fába (`homePath`, az undo naplóból) | Különben az áthelyezett track kiesne a mappájából, és a mappa „kész” állapota nem látszana |
+| 2026-11-14 | A kereső a kiválasztott mappán belül szűr; a fa a találatok számát mutatja, üres eredménynél „Search all folders” | Kiszámítható (a szűrők összeadódnak), és a fából látszik, hol vannak a találatok |
+| 2026-11-14 | Oldalsáv a lista mellett, nem teljes magasságban; mappaváltás ⇧↑ / ⇧↓, kereső ⌘F, oldalsáv S | A waveform marad a hős; a `[` / `]` magyar billentyűzeten AltGr-rel menne, azt nem kezeljük |
 | 2026-11-07 | Egy alkalmazott migrációt akkor sem módosítunk, ha még nincs commitolva | A futó `tauri dev` a fejlesztői DB-n már lefuttatta (így lett a `0005` külön) |
+| 2026-11-15 | Tempó + keylock: a WebKit beépített time-stretche (`playbackRate` + `preservesPitch`), nem a Rubber Band (spec) | A lejátszás a WebView `<audio>`-jában van (spike-döntés); a Rubber Bandhez Rust-oldali dekódolás és hangkimenet kellene. A macOS-es WebKit az AVFoundation idő-/hangmagasság-algoritmusát használja, előnézethez várhatóan elég; ha a kézi teszt szerint nem, a Rubber Band külön lépés |
+| 2026-11-15 | Tempó ±16%, billentyűvel 0,5%-os, görgetéssel 0,1%-os lépés; trackváltáskor megmarad, újraindításkor 0%; a keylock alapból be, és megmarad | Úgy viselkedik, mint egy DJ-pult pitch fadere; a 0,1% elég egy cél-BPM eltalálásához. Egy elfelejtett tempó újraindítás után ne torzítsa a következő munkamenetet |
+| 2026-11-16 | Szinti-panel (hardveres) design: narancs keret minden vezérlőn, levendula a kiválasztottra, technikai színek funkciónként | A felhasználó kérése (Native Instruments Massive XL-szerű irány); a színek tokenekben, így egy helyről hangolható |
+| 2026-11-16 | A narancs csak állapotjelző (utoljára használt csempe, keylock), a gombok semlegesek, a fő szín marad levendula | A felhasználó szerint a sok narancs „AI-s” hatású; a minőségi hatást a visszafogottság adja |
+| 2026-11-16 | Oszlopszélesség a fejlécben húzható elválasztóval (táblázatkezelő-szerűen), nem teljes magasságú vonalakkal | A felhasználó kérése; a lista sűrű marad, a szélesség nézet-kényelem → `localStorage` |
+| 2026-11-16 | Fixed tempo session-beállítás (DB), trackenként felülírható; a kézi állítás csak a következő trackig él | A felhasználó kérése; így a fix tempó és a trackenkénti finomhangolás nem üti egymást. Fél / dupla tempóra nem igazítunk: arra a BPM range való |
+| 2026-11-16 | A beírt tempó: ±16-ig százalék, 40–300 között cél-BPM | Egy mező mindkettőre, külön kapcsoló nélkül; a két tartomány nem fed át |
+| 2026-11-16 | Átlátszó natív fejléc + ablakháttér a téma színére (#1E1E1E / #F6F6F6), nem saját rajzolt fejléc (Overlay) | A felhasználó kérése: a léc legyen az app színe; így a natív közlekedési lámpák, a húzás és a dupla kattintás érintetlen, a layoutot nem kell eltolni |
+| 2026-11-16 | Témaválasztás: system / light / dark, egy holdgombbal; a rendszerrel egyező választás = rendszer követése | Egy gomb elég (a felhasználó holdikont kért); külön „System” opció nélkül is vissza lehet térni a rendszerhez |
+| 2026-11-16 | Hangerő a WebView `<audio>.volume`-jával, négyzetes görbével, csak előnézeti (a fájlhoz nem nyúl) | Lineáris erősítésnél a poti alsó fele szinte néma lenne; a beállítás nézet-kényelem, ezért `localStorage` |
 
 ---
 
@@ -470,10 +593,10 @@ Alapelvek:
 | `KHole – Product Spec.md` | Termékleírás (magyar), a döntések forrása |
 | `docs/DEVELOPMENT.md` | Ez a napló |
 | `docs/spike-results.md` | Spike-mérések és -döntések |
-| `src/` | React UI: `lib/trackMenu.ts` (natív jobb klikk / Open in… / oszlop-menü), `lib/prefs.ts` (nézet-beállítások), `state/drag.ts` (track húzása), `components/MoveToDialog.tsx`, `components/ShortcutsDialog.tsx`, `components/DragGhost.tsx`, `App.tsx` (képernyőváltás + drop), `screens/StartScreen.tsx`, `screens/SetupScreen.tsx`, `screens/TriageScreen.tsx` (waveform + lista + döntések), `components/Waveform.tsx`, `components/NowPlaying.tsx`, `components/TrackTable.tsx`, `components/DestinationBar.tsx`, `components/Segmented.tsx`, `components/DropOverlay.tsx`, `state/app.ts` (képernyő), `state/session.ts` (session, trackek, célmappák, scan, döntések), `state/player.ts` (az `<audio>`), `state/keymap.ts` (billentyűk), `lib/api.ts` (típusos commandok + események), `lib/format.ts`, `lib/theme.ts`, `components/ui/` (shadcn) |
+| `src/` | React UI: `lib/trackMenu.ts` (natív jobb klikk / Open in… / oszlop-menü), `lib/prefs.ts` (nézet-beállítások), `state/drag.ts` (track húzása), `components/MoveToDialog.tsx`, `components/ShortcutsDialog.tsx` (a `?` lap és a hotkeyek átírása), `components/Sidebar.tsx` (kereső + mappafa), `lib/folders.ts` (fa, keresés), `screens/SummaryScreen.tsx`, `components/DragGhost.tsx`, `App.tsx` (képernyőváltás + drop), `screens/StartScreen.tsx`, `screens/SetupScreen.tsx`, `screens/TriageScreen.tsx` (waveform + lista + döntések), `components/Waveform.tsx`, `components/NowPlaying.tsx`, `components/TrackTable.tsx`, `components/DestinationBar.tsx`, `components/Segmented.tsx`, `components/DropOverlay.tsx`, `state/app.ts` (képernyő), `state/session.ts` (session, trackek, célmappák, scan, döntések), `state/player.ts` (az `<audio>`), `state/keymap.ts` (billentyűk, a felhasználó kiosztása), `lib/api.ts` (típusos commandok + események), `lib/format.ts`, `lib/theme.ts`, `components/ui/` (shadcn) |
 | `src-tauri/src/` | Rust: `lib.rs` (setup, DB megnyitása), `commands.rs`, `error.rs`, `finder.rs` (Reveal, Open with), modulok: `library/ audio/ analysis/ fileops/ store/` |
 | `src-tauri/src/library/` | `watch.rs` (FSEvents-figyelő, saját műveletek szűrése), `scan.rs` (listázás + szinkron a DB-vel), `tags.rs` (lofty), `file_key.rs`, `testutil.rs` (generált WAV a tesztekhez) |
-| `src-tauri/src/store/` | `mod.rs` (megnyitás, migráció), `sessions.rs`, `tracks.rs`, `destinations.rs`, `actions.rs` (undo napló), `peaks.rs`, `analysis.rs` (elemzés-cache, kézi BPM, mit kell elemezni); `migrations/0001`–`0011` |
+| `src-tauri/src/store/` | `mod.rs` (megnyitás, migráció), `sessions.rs`, `tracks.rs`, `destinations.rs`, `actions.rs` (undo napló), `peaks.rs`, `analysis.rs` (elemzés-cache, kézi BPM, mit kell elemezni), `settings.rs` (globális beállítások); `migrations/0001`–`0013` |
 | `src-tauri/src/fileops/` | `fs.rs` (felülírás nélküli move/copy, klón, Kuka), `mod.rs` (döntés + undo a DB-vel), `edit.rs` (átnevezés, tag írása + undo) |
 | `src-tauri/src/audio/` | `mod.rs` (cache + kéréskezelés), `decode.rs` (symphonia → mono f32, közös), `peaks.rs` (waveform-csúcsok) |
 | `src-tauri/src/analysis/` | `mod.rs` (sidecar: verzió, PCM-streamelés, eredmény), `queue.rs` (háttérsor, `analysis_progress`), `bench.rs` (mérés valódi mappán, csak teszt) |
@@ -584,3 +707,34 @@ Alapelvek:
 - `cargo test` (89), clippy, typecheck, `vite build` tiszta; a felületet nem láttam.
 - 2026-11-14: a felhasználó kézi tesztje: minden működik. **Az M8 kész.** Commit `0c663e4`, push; a CI zöld (run 43533037138).
 - **Következő:** v1.1 (spec #13–#22). Nyitva: mérés egy 120–135 BPM-es mappán.
+
+### 2026-11-14 – v1.1: hotkeyek (#14) és Summary + Undo session (#15)
+- A felhasználó kérése: #14 és #15 elkészítése, a #13 (mappafa) változatainak megbeszélése.
+- Rust: `0012` `settings` tábla, `actions::stats`, `fileops::undo_session` (progress esemény), `finder::open_folder`, öt új command.
+- UI: a `?` lapon kattintással átírható billentyűk (csere ütközésnél, Reset), a kiosztás a DB-ben; minden felirat a valódi kiosztást mutatja. Új Summary képernyő: számok, munkaidő, célmappák Finderben, Undo session megerősítéssel és progress sávval.
+- `cargo test` (93), clippy, fmt, typecheck, `vite build` tiszta; a felületet nem láttam.
+- **Következő:** kézi teszt (fent); a #13 mappafa változatai közül választás.
+
+### 2026-11-14 – v1.1: mappafa + kereső (#13)
+- A felhasználó a B változatot választotta (fa mint szűrő az Include subfolders helyett), plusz track-kereső a fa felett és oldalról nyitható / csukható oldalsáv.
+- Rust: `0013` (`include_sub` ki, `folder` be), mindig rekurzív scan és figyelés, `set_folder`, `Track.homePath`.
+- UI: `lib/folders.ts` (fa, kereső), `components/Sidebar.tsx` (kereső, fa, méretezés / becsukás a szélén), TrackTable `filter` / `empty`, a Triage mappaváltása (⇧↑ / ⇧↓), mappán belüli auto-next, ⌘F / S; a Setupban a kapcsoló helyén az almappák száma.
+- `cargo test` (93), clippy, fmt, typecheck, `vite build` tiszta; a felületet nem láttam.
+- **Következő:** a teljes v1.1 kézi tesztje (#13–#15), utána commit.
+
+### 2026-11-15 – v1.1: tempó az előnézetben, keylockkal (#17)
+- A felhasználó kérése: a spec #17 elkészítése.
+- `state/player.ts`: `tempo` / `keylock` állapot, `setTempo`, `nudgeTempo`, `resetTempo`, `toggleKeylock`, `formatTempo`; az `<audio>` `playbackRate` / `defaultPlaybackRate` / `preservesPitch` beállítása minden betöltés után.
+- `NowPlaying`: tempóvezérlő (−, százalék, +, lakat), görgetéses finomhangolás, eltolt BPM a tényeknél. `keymap`: négy új, átírható művelet (`,` `.` `T` `K`), a Triage kezeli.
+- `npm run typecheck`, `vite build` tiszta; a felületet nem láttam.
+- **Következő:** a #17 kézi tesztje (fent), a #13–#15-é is; utána commit.
+
+### 2026-11-16 – Design: szinti-panel megjelenés, hangerő-poti, tempófader
+- A felhasználó kérése: intuitívabb, Massive XL-szerű design, narancs gombkeretek, illő technikai színek, hangerőszabályzó potival, tempófader.
+- Új paletta és tokenek, `.panel-label` / `.chassis`, narancs keretes gombok és csempék, `Controls.tsx` (Knob, Fader), `NowPlaying` modulsáv, `player.volume`.
+- `npm run typecheck`, `vite build` tiszta; a felületet nem láttam.
+- **Következő:** a Design kézi tesztje (fent), a #13–#15 és #17 tesztjével együtt; utána commit.
+- Második kör ugyanaznap: visszafogott paletta (levendula fő szín, semleges gombok, narancs csak állapotra), kompakt modulsáv, oszlopszélesség-állítás a fejlécben. `typecheck` és `vite build` tiszta; a felületet nem láttam.
+- Harmadik kör: szolid görgetősávok, tempó beírással (% vagy BPM), Fixed tempo a Setupban (`0014` migráció), Open in… csak ikon. `typecheck`, `vite build`, `cargo fmt/clippy/test` (94 teszt) tiszta; a felületet nem láttam.
+- Negyedik kör: világos / sötét mód holdgombbal, átlátszó natív fejléc a téma színével (#1E1E1E / #F6F6F6), macOS-szerű semleges paletta, a poti világos módban is látszik. `typecheck`, `vite build`, `clippy` tiszta; a felületet nem láttam.
+- Ötödik kör: waveform-feliratok színe témaváltáskor, széles oszlopoknál vízszintes görgetés. Commit és push a felhasználó kérésére (a #13–#15, #17 és a Design kézi tesztje még hátravan).

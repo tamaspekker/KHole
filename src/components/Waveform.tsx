@@ -4,6 +4,7 @@ import HoverPlugin from "wavesurfer.js/plugins/hover";
 import TimelinePlugin from "wavesurfer.js/plugins/timeline";
 import { api, CANCELLED, type Track } from "@/lib/api";
 import { formatDuration } from "@/lib/format";
+import { THEME_EVENT } from "@/lib/theme";
 import { audio } from "@/state/player";
 
 const HEIGHT = 128;
@@ -111,25 +112,27 @@ export function Waveform({ track }: { track: Track | null }) {
           height: TIMELINE_HEIGHT,
           insertPosition: "afterend",
           formatTimeCallback: (s) => formatDuration(s),
-          style: { fontSize: "10px", color: token("--muted-foreground") },
+          // The timeline and the hover label are DOM, not canvas: CSS variables follow the
+          // appearance by themselves (they inherit into wavesurfer's shadow root).
+          style: { fontSize: "10px", color: "var(--muted-foreground)" },
         }),
         HoverPlugin.create({
-          lineColor: token("--muted-foreground"),
+          lineColor: "var(--muted-foreground)",
           lineWidth: 1,
           labelSize: 10,
-          labelColor: token("--foreground"),
-          labelBackground: token("--popover"),
+          labelColor: "var(--foreground)",
+          labelBackground: "var(--popover)",
           formatTimeCallback: (s) => formatDuration(s),
         }),
       ],
     });
     wsRef.current = ws;
 
-    const media = window.matchMedia("(prefers-color-scheme: light)");
+    // The appearance changed (system or the moon button): canvas colours are read once.
     const recolor = () => requestAnimationFrame(() => ws.setOptions(colors()));
-    media.addEventListener("change", recolor);
+    window.addEventListener(THEME_EVENT, recolor);
     return () => {
-      media.removeEventListener("change", recolor);
+      window.removeEventListener(THEME_EVENT, recolor);
       ws.destroy();
       wsRef.current = null;
     };

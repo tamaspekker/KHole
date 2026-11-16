@@ -125,30 +125,31 @@ fn debounce(
 }
 
 fn flush(app: &AppHandle, session_id: i64, root: &Path, paths: Vec<PathBuf>, lost: bool) {
-    let Some((include_sub, exclude)) = scope(app, session_id) else {
+    let Some(exclude) = scope(app, session_id) else {
         return;
     };
     let changed = lost
         || paths
             .iter()
             .filter(|p| !is_own(p))
-            .any(|p| is_relevant(p, root, include_sub, &exclude));
+            .any(|p| is_relevant(p, root, true, &exclude));
     if changed {
         let _ = app.emit("folder_changed", FolderChanged { session_id });
     }
 }
 
-/// The session's current scan scope, read at flush time so Setup changes apply at once.
-fn scope(app: &AppHandle, session_id: i64) -> Option<(bool, Vec<PathBuf>)> {
+/// The folders a scan leaves out (destinations inside the source), read at flush time so
+/// Setup changes apply at once. Scans always take the whole tree.
+fn scope(app: &AppHandle, session_id: i64) -> Option<Vec<PathBuf>> {
     let store = app.state::<Store>();
     let conn = store.conn().ok()?;
-    let session = sessions::get(&conn, session_id).ok()?;
+    sessions::get(&conn, session_id).ok()?;
     let exclude = destinations::paths(&conn, session_id)
         .ok()?
         .into_iter()
         .map(PathBuf::from)
         .collect();
-    Some((session.include_sub, exclude))
+    Some(exclude)
 }
 
 /// Whether a change at `path` can alter the track list of a scan of `root` (same rules as

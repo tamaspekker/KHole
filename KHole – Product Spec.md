@@ -25,7 +25,7 @@ Az irány jó, de az eredeti terv túl sok lépést tesz az első belehallgatás
 | Külön döntés: rendezés vagy csak törlés | Világos szándék | Plusz lépés, és később nem lehet váltani | Nincs külön mód: ha nincs célmappa, az app „csak törlés” módban fut. Célmappa bármikor hozzáadható |
 | Másolás vagy áthelyezés választás | Biztonságosabb, ha valaki másolni akar | Még egy képernyő | Egy kapcsoló a beállítóképernyőn, alapból **Move** |
 | Célmappák, majd hotkeyek külön lépésben | Testreszabható | Két lépés, amit egy is elvisz | Mappa hozzáadásakor automatikusan kap egy számot (1–0), átírható. Húzással is lehet célmappára dobni |
-| Mappastruktúra listázása DJ-playlist módra | Ismerős logika | Mély mappáknál sok kattintás | Oldalsáv mappafával + kapcsoló: **Include subfolders** (minden track egy listában) |
+| Mappastruktúra listázása DJ-playlist módra | Ismerős logika | Mély mappáknál sok kattintás | Az összes almappa mindig betöltődik; az oldalsáv mappafája szűrő: a gyökér = minden track egy listában, egy mappára kattintva csak az övéi |
 | Kattintásra teljes képernyős waveform | Nagy, jól látható | Ki-be lépés minden tracknél, ez öli a tempót | A waveform mindig látszik a lista felett. Döntés után azonnal indul a következő track |
 | Space = lejátszás/szünet | Ez a DJ-reflex | – | Marad |
 | ±15 mp tekerés nyíllal és egérrel | Gyors | A fel/le nyíl kell a listához | ←/→ = ±15 mp, ↑/↓ = előző/következő track, kattintás a waveformra = ugrás |
@@ -71,7 +71,7 @@ Három képernyő van, a munka 95%-a a harmadikon folyik.
 
 Egy képernyő, minden alapértékkel kitöltve. **Start** gombbal azonnal indulhat.
 
-- **Source:** a kiválasztott mappa, tracksszám, **Include subfolders** kapcsoló.
+- **Source:** a kiválasztott mappa, tracksszám, az almappák száma (mindig benne vannak; a Triage oldalsávjában lehet egyre szűkíteni).
 - **Destinations:** üres lista + **Add folder**. Minden mappa automatikusan kap számot (1–0, összesen 10), ami átírható. A többi mappa az M (Move to…) keresővel érhető el. Üres lista esetén felirat: „No destinations – cleanup mode: keep or delete only”.
 - **When sorting:** Move / Copy kapcsoló (alap: Move).
 - **Start playback at:** 0% / 25% / 40% (alap: 0%, személyre állítható).
@@ -79,7 +79,7 @@ Egy képernyő, minden alapértékkel kitöltve. **Start** gombbal azonnal indul
 
 **Elemzés az import után, egy menetben.** A mappa betöltésekor a KHole beolvassa az összes track tagjeit (cím, előadó, BPM, key, hossz). Ahol a BPM vagy a key hiányzik, ott rögtön ezután a háttérben elemez. A setup képernyőn közben egy progress sáv fut („Analyzing 37 / 480”), a Start gomb már ekkor is nyomható: a lista azonnal megjelenik, a hiányzó értékek folyamatosan töltődnek be. Az eredmények cache-be kerülnek, így ugyanazt a fájlt soha nem elemzi kétszer. A fájlok tagjeibe nem ír vissza.
 
-A beállítások mappánként megmaradnak, legközelebb egyből lehet indítani. Egy új mappa a legutóbb használt session beállításaival és célmappáival indul (az Include subfolders kivételével), így a heti promómappánál elég a Start.
+A beállítások mappánként megmaradnak, legközelebb egyből lehet indítani. Egy új mappa a legutóbb használt session beállításaival és célmappáival indul (a kiválasztott almappa és a rendezés kivételével), így a heti promómappánál elég a Start.
 
 ### 3. Triage (fő munkanézet)
 
@@ -89,7 +89,7 @@ Felülről lefelé:
 2. **Track lista** (mint egy DJ-szoftver böngészője): #, cím, előadó, BPM, key, hossz, státusz. Fejlécre kattintva rendezhető, a fejlécet húzva az oszlopok átrendezhetők. Az aktuális track kiemelve, a kezelt trackek halványítva maradnak, egy szűrővel elrejthetők.
 3. **Destination bar** alul: célmappa-csempék számmal és névvel, + a Trash csempe. Húzással is lehet rájuk dobni, a csempe számlálót mutat.
 
-Balra összecsukható **oldalsáv** a mappafával, ha nincs bekapcsolva az Include subfolders. Fent egy vékony **progress sáv**: „132 / 480 done”.
+Balra **oldalsáv** a lista mellett (a waveform teljes szélességű marad): felül egy **track-kereső** (cím, előadó, fájlnév; ékezet nélkül is talál), alatta a **mappafa** mappánként a még hátralévő számmal, a kész mappa pipát kap. A gyökér a teljes forrásmappa; egy mappát választva a lista csak az övéit mutatja (almappáival együtt), és a döntés utáni következő track is abból jön. A mappa végén a következő mappára egy gomb visz (⇧↓ / ⇧↑). Az oldalsáv a szélénél fogva húzással méretezhető és becsukható, becsukva egy keskeny sáv marad, amiből újra kinyitható (S gomb; ⌘F a keresőbe ugrik). Fent egy vékony **progress sáv**: „132 / 480 done”.
 
 ### 4. Summary (session végén)
 
@@ -97,7 +97,7 @@ Hány track ment melyik mappába, hány a Kukába, mennyi idő. **Undo session**
 
 ## Billentyűparancsok
 
-Minden művelet egy gomb, módosító nélkül. Minden kiosztás átírható a beállításokban.
+Minden művelet egy gomb, módosító nélkül. Minden kiosztás átírható a `?` lapon (a billentyűre kattintva); az 1–0 számok maradnak, hogy melyik célmappa melyik számon van, azt a Setupban lehet állítani.
 
 | Billentyű | Művelet |
 | --- | --- |
@@ -105,6 +105,9 @@ Minden művelet egy gomb, módosító nélkül. Minden kiosztás átírható a b
 | ← / → | Vissza / előre 15 mp |
 | Shift + ← / → | Vissza / előre 60 mp |
 | ↑ / ↓ | Előző / következő track (nem dönt, csak lép) |
+| Shift + ↑ / ↓ | Előző / következő mappa (mappafa) |
+| Cmd + F | Track-kereső |
+| S | Oldalsáv ki / be |
 | 1–0 | Áthelyezés / másolás az adott célmappába, majd következő track |
 | M | Move to…: kereső a 10-en felüli célmappákhoz |
 | Backspace | Kukába, majd következő track |
@@ -119,7 +122,7 @@ Az MVP 12 feature, ezzel a saját mappáid már feldolgozhatók. A többi csak a
 
 | # | Feature | Fázis |
 | --- | --- | --- |
-| 1 | Mappa importálása (gomb + drag & drop), Include subfolders, tagek beolvasása + hiányzó BPM/key elemzése a háttérben, cache-sel | MVP |
+| 1 | Mappa importálása (gomb + drag & drop), almappákkal együtt, tagek beolvasása + hiányzó BPM/key elemzése a háttérben, cache-sel | MVP |
 | 2 | Célmappák hozzáadása, 1–0 gombok + Move to… kereső (M) | MVP |
 | 3 | Move / Copy kapcsoló | MVP |
 | 4 | Track lista: cím, előadó, BPM, key, hossz (tagekből), rendezhető és átrendezhető oszlopok, kezelt trackek szűrője | MVP |
@@ -131,7 +134,7 @@ Az MVP 12 feature, ezzel a saját mappáid már feldolgozhatók. A többi csak a
 | 10 | Session mentése és folytatása | MVP |
 | 11 | Destination bar húzható csempékkel | MVP |
 | 12 | Reveal in Finder | MVP |
-| 13 | Mappafa az oldalsávban | v1.1 |
+| 13 | Mappafa az oldalsávban (szűrő, az Include subfolders helyett) + track-kereső, összecsukható oldalsáv | v1.1 |
 | 14 | Hotkeyek átírása a beállításokban | v1.1 |
 | 15 | Summary képernyő + Undo session | v1.1 |
 | 16 | Elemzés pontosságának finomítása; BPM-tartomány session-beállításként (az elemzett BPM felezése / duplázása, a Traktor mintájára) – a tartomány már az M7-ben | v1.1 |

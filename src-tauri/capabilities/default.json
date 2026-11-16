@@ -3,5 +3,10 @@
   "identifier": "default",
   "description": "Main window. File system, DB and sidecar access stays in Rust commands.",
   "windows": ["main"],
-  "permissions": ["core:default", "opener:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-theme",
+    "core:window:allow-set-background-color",
+    "opener:default"
+  ]
 }

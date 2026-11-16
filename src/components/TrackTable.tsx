@@ -29,6 +29,16 @@ declare module "@tanstack/react-table" {
 type Row = Track & { index: number };
 
 const ROW_HEIGHT = 28;
+/** Matches the rows' `gap-3` and `px-3` (px). */
+const GRID_GAP = 12;
+const ROW_PADDING = 12;
+
+/** The smallest a default column gets: the first length of its grid size ("minmax(8rem, 3fr)" → 128). */
+function minPx(size: string | undefined): number {
+  const m = size?.match(/(\d+(?:\.\d+)?)(rem|px)/);
+  if (!m) return 0;
+  return Number(m[1]) * (m[2] === "rem" ? 16 : 1);
+}
 
 const STATUS_LABEL: Record<TrackStatus, string> = {
   pending: "",
@@ -167,6 +177,27 @@ const LOCKED_COLUMN = "title";
 
 const ORDER_PREF = "columns.order";
 const HIDDEN_PREF = "columns.hidden";
+const WIDTHS_PREF = "columns.widths";
+/** A column dragged narrower than this would only show "…". */
+const MIN_COLUMN_WIDTH = 32;
+
+/** Widths (px) the user dragged, by column id; the others keep their default. */
+type Widths = Record<string, number>;
+
+const isWidths = (v: unknown): v is Widths =>
+  typeof v === "object" &&
+  v != null &&
+  !Array.isArray(v) &&
+  Object.values(v).every((w) => typeof w === "number" && Number.isFinite(w) && w > 0);
+
+function loadWidths(): Widths {
+  const saved = loadPref<Widths>(WIDTHS_PREF, {}, isWidths);
+  return Object.fromEntries(
+    Object.entries(saved)
+      .filter(([id]) => COLUMN_IDS.includes(id))
+      .map(([id, w]) => [id, Math.max(MIN_COLUMN_WIDTH, Math.round(w))]),
+  );
+}
 
 /** Saved order, with unknown ids dropped and new columns appended. */
 function loadOrder(): string[] {
@@ -201,6 +232,10 @@ interface Props {
   /** Only tracks still to do are listed (and the current one, until you move on). */
   hideDone: boolean;
   onShowDone: () => void;
+  /** Only these tracks are listed (the selected folder, the search). */
+  filter?: ((track: Track) => boolean) | null;
+  /** Shown instead of the default when no row is left. */
+  empty?: ReactNode;
   /** The session's saved sort order (JSON, see `encodeSort`); null: folder order. */
   initialSort: string | null;
   onSortChange: (sort: string | null) => void;
@@ -280,6 +315,8 @@ export function TrackTable({
   onDropTrack,
   hideDone,
   onShowDone,
+  filter,
+  empty,
   initialSort,
   onSortChange,
 }: Props) {
@@ -296,6 +333,8 @@ export function TrackTable({
   useEffect(() => onSortChange(encodeSort(sorting)), [sorting, onSortChange]);
   const [columnOrder, setColumnOrder] = useState<string[]>(loadOrder);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(loadHidden);
+  const [widths, setWidths] = useState<Widths>(loadWidths);
+  useEffect(() => savePref(WIDTHS_PREF, widths), [widths]);
   useEffect(() => savePref(ORDER_PREF, columnOrder), [columnOrder]);
   useEffect(
     () =>
@@ -315,13 +354,12 @@ export function TrackTable({
     getRowId: (r) => String(r.id),
   });
   const sortedRows = table.getRowModel().rows;
-  const rows = useMemo(
-    () =>
-      hideDone
-        ? sortedRows.filter((r) => r.original.status === "pending" || r.original.id === currentId)
-        : sortedRows,
-    [sortedRows, hideDone, currentId],
-  );
+  const rows = useMemo(() => {
+    const shown = filter ? sortedRows.filter((r) => filter(r.original)) : sortedRows;
+    return hideDone
+      ? shown.filter((r) => r.original.status === "pending" || r.original.id === currentId)
+      : shown;
+  }, [sortedRows, filter, hideDone, currentId]);
 
   // ── Columns: drag a header to reorder, right-click to show / hide ─────────────────
   const headerRow = useRef<HTMLDivElement>(null);
@@ -374,6 +412,43 @@ export function TrackTable({
     window.addEventListener("pointercancel", up);
   };
 
+  // ── Column widths: drag the divider between two headers (as in a spreadsheet) ─────
+  const [resizing, setResizing] = useState<string | null>(null);
+
+  const beginResize = (e: ReactPointerEvent<HTMLElement>, id: string) => {
+    if (e.button !== 0) return;
+    e.stopPropagation(); // not a column move
+    e.preventDefault();
+    const cell = e.currentTarget.closest<HTMLElement>("[data-col]");
+    if (!cell) return;
+    const startX = e.clientX;
+    const startWidth = cell.getBoundingClientRect().width;
+    setResizing(id);
+    document.documentElement.classList.add("resizing-column");
+
+    const move = (ev: PointerEvent) => {
+      const w = Math.max(MIN_COLUMN_WIDTH, Math.round(startWidth + ev.clientX - startX));
+      setWidths((prev) => (prev[id] === w ? prev : { ...prev, [id]: w }));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      document.documentElement.classList.remove("resizing-column");
+      setResizing(null);
+      swallowNextClick(); // not a sort
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+
+  const resetWidth = (id: string) =>
+    setWidths((prev) => {
+      const { [id]: _, ...rest } = prev;
+      return rest;
+    });
+
   const onHeaderMenu = () =>
     void showColumnsMenu(
       columnOrder.map((id) => ({
@@ -388,8 +463,10 @@ export function TrackTable({
         onReset: () => {
           removePref(ORDER_PREF);
           removePref(HIDDEN_PREF);
+          removePref(WIDTHS_PREF);
           setColumnOrder(COLUMN_IDS);
           setColumnVisibility({});
+          setWidths({});
         },
       },
     );
@@ -414,174 +491,207 @@ export function TrackTable({
 
   const gridTemplateColumns = table
     .getVisibleLeafColumns()
-    .map((c) => c.columnDef.meta?.width ?? "1fr")
+    .map((c) => (widths[c.id] ? `${widths[c.id]}px` : (c.columnDef.meta?.width ?? "1fr")))
     .join(" ");
+  // The narrowest the columns can get; wider than the window, the whole list (header, row
+  // highlights) scrolls sideways together instead of the cells spilling out of the rows.
+  const visible = table.getVisibleLeafColumns();
+  const minWidth =
+    visible.reduce((sum, c) => sum + (widths[c.id] ?? minPx(c.columnDef.meta?.width)), 0) +
+    GRID_GAP * Math.max(visible.length - 1, 0) +
+    2 * ROW_PADDING;
 
   return (
     <div ref={scrollRef} role="table" className="min-h-0 flex-1 overflow-auto text-[13px]">
-      <div
-        role="rowgroup"
-        className="sticky top-0 z-10 border-b border-border bg-background"
-        onContextMenu={(e) => {
-          e.preventDefault();
-          onHeaderMenu();
-        }}
-      >
-        {table.getHeaderGroups().map((hg) => (
-          <div
-            key={hg.id}
-            ref={headerRow}
-            role="row"
-            className="relative grid gap-3 px-3"
-            style={{ gridTemplateColumns }}
-          >
-            {colDrag && (
-              <span
-                className="pointer-events-none absolute inset-y-1 w-0.5 rounded bg-brand"
-                style={{ left: colDrag.lineX - 1 }}
-              />
-            )}
-            {hg.headers.map((h) => {
-              const sorted = h.column.getIsSorted();
-              const numeric = h.column.columnDef.meta?.numeric;
-              return (
-                <button
-                  key={h.id}
-                  data-col={h.column.id}
-                  role="columnheader"
-                  title="Click to sort · drag to move · right-click for columns"
-                  onPointerDown={(e) => beginColumnDrag(e, h.column.id)}
-                  aria-sort={
-                    sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"
-                  }
-                  onClick={h.column.getToggleSortingHandler()}
-                  className={cn(
-                    "flex h-7 min-w-0 items-center gap-1 text-xs font-medium text-muted-foreground select-none hover:text-foreground",
-                    numeric && "justify-end",
-                    colDrag?.id === h.column.id && "text-brand opacity-60",
-                  )}
-                >
-                  <span className="truncate">
-                    {flexRender(h.column.columnDef.header, h.getContext())}
-                  </span>
-                  {sorted === "asc" && <ArrowUp className="size-3 shrink-0" />}
-                  {sorted === "desc" && <ArrowDown className="size-3 shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      {rows.length === 0 && hideDone && (
-        <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
-          <p>All tracks done.</p>
-          <button
-            type="button"
-            onClick={onShowDone}
-            className="text-xs text-brand hover:underline"
-          >
-            Show done tracks
-          </button>
-        </div>
-      )}
-
-      <div role="rowgroup" className="relative" style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((v) => {
-          const row = rows[v.index];
-          const current = row.original.id === currentId;
-          return (
+      <div style={{ minWidth }}>
+        <div
+          role="rowgroup"
+          className="sticky top-0 z-10 border-b border-border bg-panel-header"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            onHeaderMenu();
+          }}
+        >
+          {table.getHeaderGroups().map((hg) => (
             <div
-              key={row.id}
+              key={hg.id}
+              ref={headerRow}
               role="row"
-              aria-selected={current}
-              onPointerDown={
-                DECIDABLE_STATUS.includes(row.original.status)
-                  ? (e) => beginTrackDrag(e, row.original, onDropTrack)
-                  : undefined
-              }
-              onClick={() => onSelect(row.original)}
-              onDoubleClick={() => {
-                window.clearTimeout(editTimer.current);
-                onActivate(row.original);
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                onContextMenu(row.original);
-              }}
-              className={cn(
-                "absolute inset-x-0 grid cursor-default items-center gap-3 px-3 select-none",
-                current
-                  ? "bg-brand/20 shadow-[inset_2px_0_0_var(--brand)]"
-                  : cn("hover:bg-accent/60", v.index % 2 === 1 && "bg-muted/30"),
-                row.original.status !== "pending" && !current && "opacity-45",
-              )}
-              style={{
-                gridTemplateColumns,
-                height: ROW_HEIGHT,
-                transform: `translateY(${v.start}px)`,
-              }}
+              className="relative grid gap-3 px-3"
+              style={{ gridTemplateColumns }}
             >
-              {row.getVisibleCells().map((cell) => {
-                const meta = cell.column.columnDef.meta;
-                const content = flexRender(cell.column.columnDef.cell, cell.getContext());
-                const text = cell.getValue();
-                const field = EDITABLE[cell.column.id];
-                const track = row.original;
-                const canEdit = field && current && EDITABLE_STATUS.includes(track.status);
-                if (canEdit && editing?.id === track.id && editing.field === field) {
-                  const initial = editValue(track, field);
-                  return (
-                    <div key={cell.id} role="cell" className="min-w-0">
-                      <EditCell
-                        initial={initial}
-                        placeholder={field === "title" ? stem(track.path) : undefined}
-                        onDone={(value) => {
-                          setEditing(null);
-                          if (value != null && value.trim() !== initial.trim()) {
-                            onEdit(track, field, value);
-                          }
-                        }}
-                      />
-                    </div>
-                  );
-                }
+              {colDrag && (
+                <span
+                  className="pointer-events-none absolute inset-y-1 w-0.5 rounded bg-brand"
+                  style={{ left: colDrag.lineX - 1 }}
+                />
+              )}
+              {hg.headers.map((h) => {
+                const sorted = h.column.getIsSorted();
+                const numeric = h.column.columnDef.meta?.numeric;
                 return (
-                  <div
-                    key={cell.id}
-                    role="cell"
-                    onClick={
-                      canEdit
-                        ? () => {
-                            // A click on the selected row's cell edits it (as in Finder).
-                            window.clearTimeout(editTimer.current);
-                            editTimer.current = window.setTimeout(
-                              () => setEditing({ id: track.id, field }),
-                              EDIT_DELAY_MS,
-                            );
-                          }
-                        : undefined
+                  <button
+                    key={h.id}
+                    data-col={h.column.id}
+                    role="columnheader"
+                    title="Click to sort · drag to move · right-click for columns"
+                    onPointerDown={(e) => beginColumnDrag(e, h.column.id)}
+                    aria-sort={
+                      sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"
                     }
-                    title={
-                      canEdit
-                        ? `${typeof text === "string" ? `${text} – ` : ""}click to edit`
-                        : typeof text === "string"
-                          ? text
-                          : undefined
-                    }
+                    onClick={h.column.getToggleSortingHandler()}
                     className={cn(
-                      "truncate",
-                      meta?.numeric && "tabular text-right",
-                      cell.column.id !== "title" && !current && "text-muted-foreground",
+                      "relative flex h-7 min-w-0 items-center gap-1 text-xs font-medium text-muted-foreground select-none hover:text-foreground",
+                      numeric && "justify-end",
+                      colDrag?.id === h.column.id && "text-brand opacity-60",
                     )}
                   >
-                    {content}
-                  </div>
+                    <span className="truncate">
+                      {flexRender(h.column.columnDef.header, h.getContext())}
+                    </span>
+                    {sorted === "asc" && <ArrowUp className="size-3 shrink-0" />}
+                    {sorted === "desc" && <ArrowDown className="size-3 shrink-0" />}
+                    {/* In the 12 px gap after the header: drag to resize, double-click for the default. */}
+                    <span
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={`Resize ${columnLabel(h.column.id)}`}
+                      title="Drag to resize · double-click for the default width"
+                      onPointerDown={(e) => beginResize(e, h.column.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        resetWidth(h.column.id);
+                      }}
+                      className="group/rz absolute top-0 -right-[10px] z-10 flex h-full w-2 cursor-col-resize justify-center"
+                    >
+                      <span
+                        className={cn(
+                          "my-1.5 w-px",
+                          resizing === h.column.id
+                            ? "bg-brand"
+                            : "bg-border group-hover/rz:bg-muted-foreground",
+                        )}
+                      />
+                    </span>
+                  </button>
                 );
               })}
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        {rows.length === 0 && empty}
+        {rows.length === 0 && !empty && hideDone && (
+          <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
+            <p>All tracks done.</p>
+            <button
+              type="button"
+              onClick={onShowDone}
+              className="text-xs text-brand hover:underline"
+            >
+              Show done tracks
+            </button>
+          </div>
+        )}
+
+        <div role="rowgroup" className="relative" style={{ height: virtualizer.getTotalSize() }}>
+          {virtualizer.getVirtualItems().map((v) => {
+            const row = rows[v.index];
+            const current = row.original.id === currentId;
+            return (
+              <div
+                key={row.id}
+                role="row"
+                aria-selected={current}
+                onPointerDown={
+                  DECIDABLE_STATUS.includes(row.original.status)
+                    ? (e) => beginTrackDrag(e, row.original, onDropTrack)
+                    : undefined
+                }
+                onClick={() => onSelect(row.original)}
+                onDoubleClick={() => {
+                  window.clearTimeout(editTimer.current);
+                  onActivate(row.original);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  onContextMenu(row.original);
+                }}
+                className={cn(
+                  "absolute inset-x-0 grid cursor-default items-center gap-3 px-3 select-none",
+                  current
+                    ? "bg-brand/20 shadow-[inset_2px_0_0_var(--brand)]"
+                    : cn("hover:bg-accent/60", v.index % 2 === 1 && "bg-muted/30"),
+                  row.original.status !== "pending" && !current && "opacity-45",
+                )}
+                style={{
+                  gridTemplateColumns,
+                  height: ROW_HEIGHT,
+                  transform: `translateY(${v.start}px)`,
+                }}
+              >
+                {row.getVisibleCells().map((cell) => {
+                  const meta = cell.column.columnDef.meta;
+                  const content = flexRender(cell.column.columnDef.cell, cell.getContext());
+                  const text = cell.getValue();
+                  const field = EDITABLE[cell.column.id];
+                  const track = row.original;
+                  const canEdit = field && current && EDITABLE_STATUS.includes(track.status);
+                  if (canEdit && editing?.id === track.id && editing.field === field) {
+                    const initial = editValue(track, field);
+                    return (
+                      <div key={cell.id} role="cell" className="min-w-0">
+                        <EditCell
+                          initial={initial}
+                          placeholder={field === "title" ? stem(track.path) : undefined}
+                          onDone={(value) => {
+                            setEditing(null);
+                            if (value != null && value.trim() !== initial.trim()) {
+                              onEdit(track, field, value);
+                            }
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      key={cell.id}
+                      role="cell"
+                      onClick={
+                        canEdit
+                          ? () => {
+                              // A click on the selected row's cell edits it (as in Finder).
+                              window.clearTimeout(editTimer.current);
+                              editTimer.current = window.setTimeout(
+                                () => setEditing({ id: track.id, field }),
+                                EDIT_DELAY_MS,
+                              );
+                            }
+                          : undefined
+                      }
+                      title={
+                        canEdit
+                          ? `${typeof text === "string" ? `${text} – ` : ""}click to edit`
+                          : typeof text === "string"
+                            ? text
+                            : undefined
+                      }
+                      className={cn(
+                        "truncate",
+                        meta?.numeric && "tabular text-right",
+                        cell.column.id !== "title" && !current && "text-muted-foreground",
+                      )}
+                    >
+                      {content}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

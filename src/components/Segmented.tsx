@@ -20,7 +20,7 @@ export function Segmented<T extends string | number>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cn("inline-flex items-center gap-0.5 rounded-md bg-muted/60 p-0.5", className)}
+      className={cn("inline-flex items-center gap-0.5 rounded-md bg-background/70 p-0.5", className)}
     >
       {options.map((o) => (
         <button
@@ -32,7 +32,7 @@ export function Segmented<T extends string | number>({
           className={cn(
             "tabular rounded-[5px] px-2 py-0.5 text-xs",
             value === o.value
-              ? "bg-background text-foreground shadow-sm"
+              ? "bg-foreground/80 font-medium text-background"
               : "text-muted-foreground hover:text-foreground",
           )}
         >

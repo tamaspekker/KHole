@@ -2,6 +2,7 @@
 //! (rename, title / artist tag, BPM) made in the list.
 
 use rusqlite::{Connection, OptionalExtension, params};
+use serde::Serialize;
 
 use crate::error::Result;
 
@@ -161,6 +162,50 @@ pub fn mark_undone(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+/// A break longer than this between two actions is not counted as working time.
+pub const IDLE_MS: i64 = 5 * 60 * 1000;
+
+/// What the Summary shows from the undo log.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stats {
+    /// Actions ⌘Z / Undo session can still revert.
+    pub open: i64,
+    /// Of those, edits from the list (rename, tag, BPM).
+    pub open_edits: i64,
+    /// Working time (ms): the time between consecutive actions, undone ones included, with
+    /// breaks longer than [`IDLE_MS`] left out.
+    pub active_ms: i64,
+    /// Unix ms of the first and the last action.
+    pub first_ts: Option<i64>,
+    pub last_ts: Option<i64>,
+}
+
+pub fn stats(conn: &Connection, session_id: i64) -> Result<Stats> {
+    let (open, open_edits): (i64, i64) = conn.query_row(
+        "SELECT count(*), coalesce(sum(kind IN ('rename', 'tag', 'bpm')), 0)
+         FROM actions WHERE session_id = ?1 AND undone = 0 AND track_id IS NOT NULL",
+        [session_id],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let ts: Vec<i64> = conn
+        .prepare("SELECT ts FROM actions WHERE session_id = ?1 ORDER BY ts, id")?
+        .query_map([session_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let active_ms = ts
+        .windows(2)
+        .map(|w| w[1] - w[0])
+        .filter(|gap| (0..=IDLE_MS).contains(gap))
+        .sum();
+    Ok(Stats {
+        open,
+        open_edits,
+        active_ms,
+        first_ts: ts.first().copied(),
+        last_ts: ts.last().copied(),
+    })
+}
+
 /// Closes the open actions of a track whose file came back on its own (Put Back from the
 /// Trash, dragged back in Finder): there is nothing left to undo for them.
 pub fn close_open(conn: &Connection, track_id: i64) -> Result<()> {
@@ -211,5 +256,44 @@ mod tests {
         assert_eq!(last_undoable(&conn, s).unwrap().unwrap().id, a);
         mark_undone(&conn, a).unwrap();
         assert_eq!(last_undoable(&conn, s).unwrap(), None);
+    }
+
+    #[test]
+    fn stats_count_open_actions_and_working_time() {
+        let store = Store::open_in_memory().unwrap();
+        let conn = store.conn().unwrap();
+        let s = sessions::open(&conn, "/src", 1).unwrap().id;
+        conn.execute_batch(&format!(
+            "INSERT INTO tracks (id, session_id, path, file_key) VALUES (1, {s}, '/src/a', 'k')"
+        ))
+        .unwrap();
+        let empty = stats(&conn, s).unwrap();
+        assert_eq!((empty.open, empty.active_ms, empty.first_ts), (0, 0, None));
+
+        let new = |kind| NewAction {
+            session_id: s,
+            track_id: 1,
+            kind,
+            src: "/src/a",
+            dst: None,
+            renamed: false,
+            prev_status: "pending",
+            destination_id: None,
+            duplicate: false,
+            field: None,
+            old_value: None,
+            new_value: None,
+        };
+        let min = 60_000;
+        record(&conn, &new(Kind::Keep), 0).unwrap();
+        let b = record(&conn, &new(Kind::Bpm), 2 * min).unwrap();
+        // A lunch break: not working time.
+        record(&conn, &new(Kind::Keep), 62 * min).unwrap();
+        record(&conn, &new(Kind::Rename), 63 * min).unwrap();
+        mark_undone(&conn, b).unwrap();
+        let st = stats(&conn, s).unwrap();
+        assert_eq!((st.open, st.open_edits), (3, 1));
+        assert_eq!(st.active_ms, 3 * min);
+        assert_eq!((st.first_ts, st.last_ts), (Some(0), Some(63 * min)));
     }
 }

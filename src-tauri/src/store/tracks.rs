@@ -32,6 +32,9 @@ pub struct Track {
     pub bpm_source: Option<&'static str>,
     /// The key comes from the analysis (the tags have none).
     pub key_analyzed: bool,
+    /// Where the file is (or was, before it was moved or trashed) inside the source folder:
+    /// the folder tree files the track under this path's folder.
+    pub home_path: String,
 }
 
 /// Inserts new rows and refreshes the tags of known ones in one transaction. A `missing`
@@ -125,7 +128,13 @@ pub fn path(conn: &Connection, id: i64) -> Result<String> {
 /// the tags win over the analysis. A BPM set by hand wins over both.
 const COLUMNS: &str = "tracks.id, tracks.path, tracks.title, tracks.artist, tracks.bpm,
      tracks.musical_key, tracks.duration, tracks.format, tracks.bitrate, tracks.status,
-     an.bpm, an.musical_key, an.scale, ov.bpm, s.bpm_min";
+     an.bpm, an.musical_key, an.scale, ov.bpm, s.bpm_min,
+     CASE WHEN tracks.status IN ('moved', 'trashed', 'missing') THEN coalesce(
+       (SELECT a.src FROM actions a WHERE a.track_id = tracks.id AND a.undone = 0
+          AND a.kind IN ('move', 'trash') ORDER BY a.id DESC LIMIT 1),
+       (SELECT a.src FROM actions a WHERE a.track_id = tracks.id ORDER BY a.id LIMIT 1),
+       tracks.path)
+     ELSE tracks.path END";
 const FROM: &str = "tracks JOIN sessions s ON s.id = tracks.session_id
                     LEFT JOIN analysis_cache an ON an.file_key = tracks.file_key
                     LEFT JOIN bpm_overrides ov ON ov.file_key = tracks.file_key";
@@ -163,6 +172,7 @@ fn from_row(r: &rusqlite::Row) -> rusqlite::Result<Track> {
         format: r.get(7)?,
         bitrate: r.get(8)?,
         status: r.get(9)?,
+        home_path: r.get(15)?,
     })
 }
 

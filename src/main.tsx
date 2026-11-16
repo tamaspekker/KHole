@@ -1,10 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { followSystemTheme } from "./lib/theme";
+import { initTheme } from "./lib/theme";
+import { loadKeys } from "./state/keymap";
 import "./index.css";
 
-followSystemTheme();
+initTheme();
+void loadKeys();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

@@ -35,3 +35,6 @@ export const isStringArray = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((x) => typeof x === "string");
 
 export const isBoolean = (v: unknown): v is boolean => typeof v === "boolean";
+
+export const isUnitNumber = (v: unknown): v is number =>
+  typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;

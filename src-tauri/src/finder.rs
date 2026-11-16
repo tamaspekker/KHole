@@ -39,6 +39,25 @@ pub fn reveal(path: &Path) -> Result<()> {
     tauri_plugin_opener::reveal_item_in_dir(path).map_err(|e| Error::Invalid(e.to_string()))
 }
 
+/// Opens a Finder window showing the folder's contents.
+pub fn open_folder(path: &Path) -> Result<()> {
+    if !path.is_dir() {
+        return Err(Error::NotFound(format!(
+            "{} (moved or deleted, or its drive is not connected)",
+            path.display()
+        )));
+    }
+    let status = Command::new("/usr/bin/open").arg(path).status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(Error::Invalid(format!(
+            "Could not open {}.",
+            path.display()
+        )))
+    }
+}
+
 /// The apps macOS offers for the file (Finder's "Open With"), the default one first, then by
 /// name. Duplicates (the same app in two places) are listed once.
 pub fn apps_for(path: &Path) -> Result<Vec<App>> {
@@ -125,6 +144,10 @@ mod tests {
         assert!(matches!(reveal(p), Err(Error::NotFound(_))));
         assert!(matches!(apps_for(p), Err(Error::NotFound(_))));
         assert!(matches!(open_with(p, None), Err(Error::NotFound(_))));
+        assert!(matches!(
+            open_folder(Path::new("/nonexistent/khole")),
+            Err(Error::NotFound(_))
+        ));
     }
 
     /// LaunchServices knows apps for a WAV file (at least Music / QuickTime on any Mac).
