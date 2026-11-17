@@ -23,9 +23,10 @@ Ez a fájl a fejlesztés egyetlen állapot-forrása: mi kész, mi következik, m
 | M6 Tempó | Destination bar, Move to…, `?` lap, szűrő, oszlopok | ✅ Kész (2026-11-12) |
 | M7 Elemzés | Essentia sidecar a háttérben, progress, cache | ✅ Kész (2026-11-13); nyitva: mérés egy 120–135 BPM-es mappán |
 | M8 Session | Mentés és folytatás, mappánkénti beállítások, új mappa sablonból, Locate…, ablakméret | ✅ Kész (2026-11-14) |
-| v1.1 #13–#15 | Mappafa + kereső, hotkeyek átírása, Summary + Undo session | 🟡 Kész, kézi tesztre vár (2026-11-14) |
-| v1.1 #17 | Tempó az előnézetben, keylockkal | 🟡 Kész, kézi tesztre vár (2026-11-15) |
+| v1.1 #13–#15 | Mappafa + kereső, hotkeyek átírása, Summary + Undo session | ✅ Kész, tesztelve (2026-11-16) |
+| v1.1 #17 | Tempó az előnézetben, keylockkal | ✅ Kész, tesztelve (2026-11-16) |
 | Design | Szinti-panel megjelenés, hangerő-poti, tempófader, oszlopszélesség, Fixed tempo | 🟡 Kész, kézi tesztre vár (2026-11-16) |
+| Kiadás 0.1.0 | README, notices, Help menü, release workflow, ad-hoc aláírt `.dmg` | 🟡 Kész, a tag push vár (2026-11-17) |
 | v1.1+ | Spec #16, #18–#22 | ⬜ |
 
 ---
@@ -142,7 +143,7 @@ Tesztek: 54 unit teszt + 7 `#[ignore]` (köztük négy valódi Kukás teszt: `ca
 - [x] **Open in…** (gomb + a jobb klikkes menü „Open With” almenüje): `track_apps` = `NSWorkspace.URLsForApplicationsToOpenURL:` (az alapértelmezett elöl, „(default)” jelöléssel, a duplikált appok egyszer); `open_track` = `/usr/bin/open -a <app> <fájl>`, de csak olyan appal, amelyet a macOS maga kínál a fájlhoz.
 - [x] **Natív macOS menük** (`lib/trackMenu.ts`, `@tauri-apps/api/menu`): jobb klikk egy soron → Play / Reveal in Finder / Open With ▸. A menüpontok csak Rust commandokat hívnak.
 - [x] **File oszlop** a listában (fájlnév kiterjesztés nélkül, a Title után, rendezhető): a Title a tagből jön, így az átnevezés eddig nem látszott (a felhasználó kézi tesztje alapján)
-- [ ] Undo session → v1.1 a Summary-val (a napló megvan hozzá).
+- [x] Undo session → elkészült a v1.1-ben a Summary-val.
 
 Tesztek: 62 unit teszt + 7 `#[ignore]`; új: relevancia-szűrő, saját útvonalak, valódi FSEvents-folyam, átnevezés (két track, köztük az aktuális), másolat ≠ átnevezés, eltűnt → `missing` → vissza, appok egy WAV-hoz, nem kínált app elutasítása.
 
@@ -356,7 +357,7 @@ A felhasználó kérése: a spec #14 és #15, utána a #13. A mappafára négy v
 - [x] **Undo session**: megerősítés után az összes nyitott akció visszavonása, a legújabbtól, pontosan úgy, mint a ⌘Z ismételve (a szerkesztések is, különben egy áthelyezett, majd átnevezett track nem jönne vissza). Progress sáv (`undo_progress`). Ha egy akció nem vonható vissza (pl. eltűnt a forrásmappa), ott megáll, kiírja az okát, a régebbiek érintetlenek, újrapróbálható. A nem pontosan visszakerült fájlok (névütközés stb.) listája.
 - [x] Rust: `actions::stats`, `fileops::undo_session`, commandok: `undo_session`, `session_stats`, `open_destination`, `get_setting`, `set_setting`.
 - [x] Tesztek: `settings`, `stats` (szünet kiszűrése, nyitott szerkesztések), Undo session (minden vissza, sorrend, második futás üres; megállás nem visszavonható akciónál, utána ⌘Z működik), `open_folder` hiányzó mappára. `cargo test` (93), clippy `-D warnings`, `cargo fmt`, typecheck, `vite build` tiszta; a felületet nem láttam.
-- [ ] Kézi teszt (lent).
+- [x] Kézi teszt (lent): a felhasználó szerint rendben (2026-11-16).
 
 ### Kézi teszt (v1.1 #13–#15)
 **Mappafa és kereső**
@@ -384,7 +385,7 @@ A felhasználó kérése: a spec #14 és #15, utána a #13. A mappafára négy v
 - [x] **NowPlaying sor:** az óra mellett `−` / `+0.0%` / `+` és egy lakat ikon. A százalékra kattintva 0%, fölötte görgetve 0,1%-os finomhangolás (a trackpad apró lépései összeadódnak, 40 px = 0,1%). A tényeknél eltolt tempónál `124 → 127.1 BPM`.
 - [x] **Billentyűk** (Playback szakasz, mind átírható): `,` / `.` = −/+ 0,5% (nyomva tartva ismétel), `T` = 0%, `K` = keylock ki / be. A `,` és a `.` a magyar kiosztáson is ugyanott van; Shift-es változat nincs, mert sok kiosztáson a Shift más karaktert ad.
 - [x] `npm run typecheck`, `vite build` tiszta (Rust nem változott); a felületet nem láttam.
-- [ ] Kézi teszt (lent), köztük a WebKit time-stretch minőségének meghallgatása.
+- [x] Kézi teszt (lent), köztük a WebKit time-stretch minősége: a felhasználó szerint rendben (2026-11-16).
 
 ### Kézi teszt (v1.1 #17)
 1. `npm run tauri dev`, nyiss meg egy sessiont, indíts el egy ismert BPM-ű tracket.
@@ -575,6 +576,9 @@ Alapelvek:
 | 2026-11-16 | Logó: lófej, a homlokcsík a K; a felirat egyszínű, csak a ló lila | A felhasználó vázlata; szakmabeli kikacsintás, de letisztult. A K az app betűjéhez igazodik, így a logó és a felirat egy család |
 | 2026-11-16 | App-ikon Icon Composer `.icon`-ként is (Liquid Glass), a `.icns` tartalék | macOS 26 alatt csak így kap a Dock-ikon üveges keretet; a Tauri bundler támogatja |
 | 2026-11-16 | Hangerő a WebView `<audio>.volume`-jával, négyzetes görbével, csak előnézeti (a fájlhoz nem nyúl) | Lineáris erősítésnél a poti alsó fele szinte néma lenne; a beállítás nézet-kényelem, ezért `localStorage` |
+| 2026-11-17 | Az első kiadás 0.1.0, ad-hoc aláírással (`signingIdentity: "-"`), notarizáció nélkül | A felhasználó döntése: nincs 99 $/év Developer ID. Az első indításkor a System Settings › Privacy & Security › Open Anyway kell (README). A release workflow a secretek felvételével Developer ID-ra kapcsolható |
+| 2026-11-17 | Release: `v*` tag → GitHub Actions → **draft** release (`.dmg` + `SHA256SUMS.txt`), a release notes a `docs/release-notes/v<verzió>.md`-ből | Publikálás előtt átnézhető; a tag és a verzió egyezését a workflow ellenőrzi |
+| 2026-11-17 | `THIRD_PARTY_NOTICES.md` saját szkripttel (`scripts/third-party-notices.mjs`): a Rust normál függőségei, a Vite-bundle-be ténylegesen bekerülő JS-csomagok, a sidecar könyvtárai, deduplikált licencszövegekkel. A LICENSE-szel együtt az `.app` Resources-ában, a Help menüből nyitható | Nincs külső eszköz (cargo-about) függőség; a release build újragenerálja, így pontosan a linkelt verziókat írja le |
 
 ---
 
@@ -583,7 +587,7 @@ Alapelvek:
 1. **BPM-pontosság valódi zenén** (tempóváltás, breakdown, half-time, technóra hangolt tartomány) → M7-ben valódi promómappán mérni.
 2. **Elemzési sebesség:** teljes track vagy csak a középső 2 perc; hány szál → M7.
 3. **Domain** (a specből). Az identifier ettől függetlenül `io.github.tomi2400.khole` marad.
-4. **Aláírás és notarizáció** a terjesztéshez (Apple Developer ID) → a kiadás előtt.
+4. ~~Aláírás és notarizáció~~ → eldöntve (2026-11-17): a 0.1.0 ad-hoc aláírással megy, Developer ID később (lásd Döntésnapló).
 
 ---
 
@@ -751,3 +755,14 @@ Alapelvek:
 - Logó: vektorizált lófej app-stílusú K-val, app-ikon az `src-tauri/icons` alá, Start képernyő. Commit és push a holdikonnal együtt.
 - Start képernyő: csak a lófej, nagyobban; a bináris neve `KHole` (Dock-felirat `tauri dev` alatt).
 - Liquid Glass app-ikon: `KHole.icon` (a felhasználó Icon Composerben rakta össze az előkészített rétegekből), `Assets.car` a debug buildben ellenőrizve.
+
+### 2026-11-16/17 – Kiadás előkészítése (0.1.0)
+- Lista a publikáláshoz hiányzó lépésekről. A #13–#15 és a #17 kézi tesztje a felhasználó szerint rendben; a Design-kör tesztje még hátravan.
+- Döntés: ingyenes út (ad-hoc aláírás, nincs Developer ID), verzió 0.1.0.
+- `scripts/third-party-notices.mjs` → `THIRD_PARTY_NOTICES.md` (280 crate, 41 JS-csomag, 3 sidecar-könyvtár, 167 különböző licencszöveg; mind GPL-3-kompatibilis: MIT, Apache-2.0, BSD, ISC, MPL-2.0, Unicode-3.0, Zlib, BSL-1.0, CC0, AGPL-3.0). Essentia-modell nincs a bundle-ben (`--lightweight`, TensorFlow nélkül).
+- `menu.rs`: az alap menü, az About panelben copyright + kreditek, Help: KHole on GitHub, Report an Issue…, License, Third-Party Licenses (a bundle Resources-ából; `tauri dev` alatt a GitHubra mutat). `tauri.conf.json`: `copyright`, `resources`, `signingIdentity: "-"`.
+- `.github/workflows/release.yml`, `docs/release-notes/v0.1.0.md`, új README (telepítés, első indítás, billentyűk, kiadás menete).
+- Lokális release build: `KHole_0.1.0_aarch64.dmg` (10 MB), az `.app` 19 MB; `codesign --verify --deep --strict` rendben (ad-hoc, hardened runtime), a sidecar is aláírva, a LICENSE és a notices a Resources-ban, a sidecar fut az `.app`-ból, az app elindul. A menüt nem láttam (nincs kisegítő hozzáférés).
+- **Buktató (actool):** Claude Code alól futtatva a bundler első `actool`-hívása mindig „attempt to insert nil object” hibával száll el, kézzel ugyanazokkal az argumentumokkal, ugyanabból a környezetből viszont sikerül. Megoldás: egy `actool` wrapper a PATH elején, ami hibánál `pkill -9 ibtoold` és újrapróbál – a második menet sikerül. Saját terminálból valószínűleg elég a `pkill -9 -x ibtoold` (a sima `pkill` nem mindig öli meg).
+- `cargo fmt/clippy/test` (94), `typecheck` tiszta.
+- **Következő:** a Design kézi tesztje és a Help menü megnézése; push, majd `git tag v0.1.0 && git push origin v0.1.0` → a draft release átnézése és publikálása.

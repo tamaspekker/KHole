@@ -1,0 +1,109 @@
+name: Release
+
+# Push a version tag (v0.1.0) to build KHole.dmg and attach it to a *draft* GitHub release.
+# Review the draft, then publish it by hand.
+#
+# Signing: ad-hoc by default (`signingIdentity: "-"` in tauri.conf.json); users confirm the
+# first launch in System Settings › Privacy & Security › Open Anyway. To switch to Developer
+# ID signing + notarization later, add these repository secrets – nothing else changes:
+#   APPLE_CERTIFICATE (base64 .p12), APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+#   APPLE_ID, APPLE_PASSWORD (app-specific password), APPLE_TEAM_ID
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest # Apple Silicon (arm64)
+    env:
+      DEVELOPER_ID: ${{ secrets.APPLE_CERTIFICATE != '' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - name: Version matches the tag
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version $version in tauri.conf.json"
+            exit 1
+          fi
+          test -f "docs/release-notes/$GITHUB_REF_NAME.md"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Sidecar – Homebrew dependencies
+        run: brew install eigen libsamplerate pkgconf
+
+      - name: Sidecar – cache key
+        id: essentia
+        run: echo "rev=$(git rev-parse HEAD:vendor/essentia)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: sidecar/khole-analyze/.essentia-static
+          key: essentia-${{ runner.os }}-${{ runner.arch }}-${{ steps.essentia.outputs.rev }}-${{ hashFiles('sidecar/khole-analyze/build.sh') }}
+
+      - name: Sidecar – build
+        run: |
+          sidecar/khole-analyze/build.sh
+          src-tauri/binaries/khole-analyze-aarch64-apple-darwin --version
+
+      # Regenerated from the exact versions this build links (Homebrew may differ locally).
+      - name: Third-party notices
+        run: node scripts/third-party-notices.mjs
+
+      - name: Build (ad-hoc signed)
+        if: env.DEVELOPER_ID != 'true'
+        run: npm run tauri build -- --bundles app,dmg
+
+      # The Tauri bundler imports the certificate, signs with it and notarizes.
+      - name: Build (Developer ID, notarized)
+        if: env.DEVELOPER_ID == 'true'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run tauri build -- --bundles app,dmg
+
+      - name: Check the bundle
+        run: |
+          app=src-tauri/target/release/bundle/macos/KHole.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          test -f "$app/Contents/Resources/LICENSE"
+          test -f "$app/Contents/Resources/THIRD_PARTY_NOTICES.md"
+          "$app/Contents/MacOS/khole-analyze" --version
+
+      - name: Rename and checksum
+        run: |
+          mkdir out
+          cp "src-tauri/target/release/bundle/dmg/KHole_${VERSION}_aarch64.dmg" "out/KHole-${VERSION}-arm64.dmg"
+          cd out && shasum -a 256 ./*.dmg > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" out/* \
+            --draft \
+            --title "KHole $VERSION" \
+            --notes-file "docs/release-notes/$GITHUB_REF_NAME.md"

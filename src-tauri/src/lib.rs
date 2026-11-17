@@ -5,6 +5,7 @@ mod error;
 mod fileops;
 mod finder;
 mod library;
+mod menu;
 mod store;
 
 use std::path::PathBuf;
@@ -26,6 +27,8 @@ pub fn run() {
         .manage(commands::Scans::default())
         .manage(audio::PeakRequests::default())
         .manage(library::watch::Watcher::default())
+        .menu(menu::build)
+        .on_menu_event(|app, event| menu::on_event(app, event.id().as_ref()))
         .setup(|app| {
             let store = store::Store::open(&db_path(app.handle())?)?;
             app.manage(store);
