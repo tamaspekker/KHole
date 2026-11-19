@@ -25,8 +25,8 @@ Ez a fájl a fejlesztés egyetlen állapot-forrása: mi kész, mi következik, m
 | M8 Session | Mentés és folytatás, mappánkénti beállítások, új mappa sablonból, Locate…, ablakméret | ✅ Kész (2026-11-14) |
 | v1.1 #13–#15 | Mappafa + kereső, hotkeyek átírása, Summary + Undo session | ✅ Kész, tesztelve (2026-11-16) |
 | v1.1 #17 | Tempó az előnézetben, keylockkal | ✅ Kész, tesztelve (2026-11-16) |
-| Design | Szinti-panel megjelenés, hangerő-poti, tempófader, oszlopszélesség, Fixed tempo | 🟡 Kész, kézi tesztre vár (2026-11-16) |
-| Kiadás 0.1.0 | README, notices, Help menü, release workflow, ad-hoc aláírt `.dmg` | 🟡 Kész, a tag push vár (2026-11-17) |
+| Design | Szinti-panel megjelenés, hangerő-poti, tempófader, oszlopszélesség, Fixed tempo | ✅ Kész, tesztelve (2026-11-19) |
+| Kiadás 0.1.0 | README, notices, Help menü, Ko-fi, release workflow, ad-hoc aláírt `.dmg` | 🟡 Tag pusholva, draft release (2026-11-19) |
 | v1.1+ | Spec #16, #18–#22 | ⬜ |
 
 ---
