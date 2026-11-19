@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FolderOpen, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/Logo";
+import { SupportLine } from "@/components/SupportButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, type RecentSession } from "@/lib/api";
 import { fileName, parentPath, tildify } from "@/lib/format";
@@ -119,6 +120,8 @@ export function StartScreen() {
           </ul>
         </section>
       )}
+
+      <SupportLine className="absolute inset-x-0 bottom-4" />
     </main>
   );
 }

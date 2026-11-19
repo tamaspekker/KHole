@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, Coffee, FolderOpen, Trash2, TriangleAlert, Undo2 } from "lucide-react";
+import { ChevronLeft, FolderOpen, Trash2, TriangleAlert, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SupportLine } from "@/components/SupportButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Dialog,
@@ -229,20 +230,7 @@ export function SummaryScreen() {
           </section>
 
           {/* A quiet thank-you line once some work is done: never a dialog, never in the way. */}
-          {done > 0 && (
-            <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-              <Coffee className="size-3.5" />
-              KHole is free.{" "}
-              <button
-                type="button"
-                onClick={() => void api.openSupport()}
-                className="underline underline-offset-2 hover:text-foreground"
-              >
-                Buy me a coffee
-              </button>{" "}
-              if it saved you time.
-            </p>
-          )}
+          {done > 0 && <SupportLine />}
         </div>
       </div>
 

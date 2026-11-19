@@ -17,6 +17,7 @@ import { NowPlaying } from "@/components/NowPlaying";
 import { TrackTable } from "@/components/TrackTable";
 import { Waveform } from "@/components/Waveform";
 import { Button } from "@/components/ui/button";
+import { SupportButton } from "@/components/SupportButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, type Decision, type EditField, type Track } from "@/lib/api";
 import { allFolders, buildTree, folderOf, inFolder, trackMatcher } from "@/lib/folders";
@@ -497,6 +498,7 @@ export function TriageScreen() {
           <SlidersHorizontal data-icon="inline-start" />
           Setup
         </Button>
+        <SupportButton />
         <ThemeToggle />
       </header>
 
