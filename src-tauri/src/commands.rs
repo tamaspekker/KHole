@@ -123,7 +123,8 @@ fn source_folder(path: &Path) -> Result<PathBuf> {
 
 #[tauri::command]
 pub fn recent_sessions(store: State<'_, Store>) -> Result<Vec<RecentSession>> {
-    sessions::recent(&*store.conn()?, 5)
+    // The Start screen scrolls the list; 50 is plenty and keeps the folder checks cheap.
+    sessions::recent(&*store.conn()?, 50)
 }
 
 /// Forgets a recent session (Start screen). If decisions were made in it, the user

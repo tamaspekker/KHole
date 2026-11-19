@@ -7,12 +7,14 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { api, type RecentSession } from "@/lib/api";
 import { fileName, parentPath, tildify } from "@/lib/format";
 import { importFolder, openFolder, useApp } from "@/state/app";
+import { useScrollFade } from "@/lib/useScrollFade";
 
 /** Import a folder (button, ⌘O or drop anywhere) or continue a recent session. */
 export function StartScreen() {
   const opening = useApp((s) => s.opening);
   const error = useApp((s) => s.error);
   const [recent, setRecent] = useState<RecentSession[]>([]);
+  const listRef = useScrollFade<HTMLUListElement>();
 
   const loadRecent = () => api.recentSessions().then(setRecent, () => setRecent([]));
   useEffect(() => {
@@ -69,11 +71,13 @@ export function StartScreen() {
       </div>
 
       {recent.length > 0 && (
-        <section className="w-full max-w-md">
+        // The list scrolls (no visible scrollbar; the edges fade where there is more). About
+        // 5½ rows tall, so the half-cut row also hints at it; shrinks in a short window.
+        <section className="flex min-h-0 w-full max-w-md flex-col">
           <h2 className="mb-2 px-3 text-xs font-medium text-muted-foreground">Recent sessions</h2>
-          <ul className="flex flex-col">
+          <ul ref={listRef} className="scroll-fade flex max-h-72 min-h-0 flex-col">
             {recent.map((r) => (
-              <li key={r.id} className="group flex items-center rounded-md hover:bg-accent">
+              <li key={r.id} className="group flex shrink-0 items-center rounded-md hover:bg-accent">
                 <button
                   disabled={opening}
                   onClick={() =>

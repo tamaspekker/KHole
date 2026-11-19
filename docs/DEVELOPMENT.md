@@ -581,6 +581,7 @@ Alapelvek:
 | 2026-11-17 | `THIRD_PARTY_NOTICES.md` saját szkripttel (`scripts/third-party-notices.mjs`): a Rust normál függőségei, a Vite-bundle-be ténylegesen bekerülő JS-csomagok, a sidecar könyvtárai, deduplikált licencszövegekkel. A LICENSE-szel együtt az `.app` Resources-ában, a Help menüből nyitható | Nincs külső eszköz (cargo-about) függőség; a release build újragenerálja, így pontosan a linkelt verziókat írja le |
 | 2026-11-19 | GitHub-felhasználónév: `tomi2400` → `tamaspekker`; minden URL, a remote és a copyright („Tamas Pekker”) átírva, a bundle identifier (`io.github.tomi2400.khole`) **marad** | Az identifier az adatbázis helye (`app_data_dir`): váltásnál eltűnnének a sessionök; csak belső azonosító, nem kell egyeznie a GitHub-névvel |
 | 2026-11-19 | Adomány: Ko-fi (`ko-fi.com/tamaspekker`), Stripe-pal (magánszemély, EUR kifizetés Revolutra). Az appban csak halkan: Help › Support KHole ☕…, kávé ikon a Triage fejlécében (a holdgomb mellett), egy sor a Start képernyő alján és a Summary alján (ha volt döntés); `FUNDING.yml`, README, release notes. A link egy helyen: `menu.rs` `SUPPORT` | A GPL engedi; felugró ablak nincs, munkaeszközben zavarna. A Ko-fi egyszeri tippnél nem von le jutalékot, a Stripe olcsóbb a PayPalnál |
+| 2026-11-19 | Recent sessions: legfeljebb 50 (eddig 5, a többi elérhetetlen volt), a lista kb. 5½ sor magas, görgethető, **látható csúszka nélkül**: a szélei elhalványulnak, ahol van még tartalom (`.scroll-fade` + `useScrollFade`) | A felhasználó kérése; a félig látszó sor és a halványulás jelzi a görgetést, a csúszka nem rontja a Start képernyőt. Újrahasználható más listákhoz |
 
 ---
 
@@ -770,4 +771,5 @@ Alapelvek:
 - 2026-11-19: GitHub-átnevezés (`tamaspekker`) végigvezetve, a remote frissítve. Az adománygombhoz a felhasználó Stripe + Ko-fi fiókot állít be; a link után: Help menü, Summary, `FUNDING.yml`, README.
 - Ko-fi beépítve: `menu::open_support` command + Help menüpont, Summary-sor (`Coffee` ikon), `.github/FUNDING.yml`. `typecheck`, `clippy` tiszta; a felületet nem láttam.
 - A felhasználó kérésére a fő felületre is: `SupportButton` (ikon a Triage fejlécében), `SupportLine` (Start alja, Summary). `typecheck` tiszta.
-- **Következő:** a Design kézi tesztje és a kávé-elemek megnézése (a Help menüt a felhasználó megnézte, rendben); push, majd `git tag v0.1.0 && git push origin v0.1.0` → a draft release átnézése és publikálása.
+- Start: a Recent sessions 50-ig, görgethető lista elhalványuló szélekkel, csúszka nélkül (`src/lib/useScrollFade.ts`, `.scroll-fade` az `index.css`-ben); alacsony ablakban összemegy. `typecheck`, `vite build`, `clippy` tiszta; a felületet nem láttam.
+- **Következő:** a Design kézi tesztje, a kávé-elemek és a görgethető Recent lista megnézése (a Help menüt a felhasználó megnézte, rendben); push, majd `git tag v0.1.0 && git push origin v0.1.0` → a draft release átnézése és publikálása.
