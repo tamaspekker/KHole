@@ -26,7 +26,7 @@ Ez a fájl a fejlesztés egyetlen állapot-forrása: mi kész, mi következik, m
 | v1.1 #13–#15 | Mappafa + kereső, hotkeyek átírása, Summary + Undo session | ✅ Kész, tesztelve (2026-11-16) |
 | v1.1 #17 | Tempó az előnézetben, keylockkal | ✅ Kész, tesztelve (2026-11-16) |
 | Design | Szinti-panel megjelenés, hangerő-poti, tempófader, oszlopszélesség, Fixed tempo | ✅ Kész, tesztelve (2026-11-19) |
-| Kiadás 0.1.0 | README, notices, Help menü, Ko-fi, release workflow, ad-hoc aláírt `.dmg` | 🟡 Tag pusholva, draft release (2026-11-19) |
+| Kiadás 0.1.0 | README, notices, Help menü, Ko-fi, release workflow, ad-hoc aláírt `.dmg` | 🟡 Draft release kész, publikálásra vár (2026-11-19) |
 | v1.1+ | Spec #16, #18–#22 | ⬜ |
 
 ---
@@ -773,4 +773,6 @@ Alapelvek:
 - A felhasználó kérésére a fő felületre is: `SupportButton` (ikon a Triage fejlécében), `SupportLine` (Start alja, Summary). `typecheck` tiszta.
 - Start: a Recent sessions 50-ig, görgethető lista elhalványuló szélekkel, csúszka nélkül (`src/lib/useScrollFade.ts`, `.scroll-fade` az `index.css`-ben); alacsony ablakban összemegy. `typecheck`, `vite build`, `clippy` tiszta; a felületet nem láttam.
 - A felhasználó szerint minden rendben (Design-kör, Help menü, kávé-elemek, Recent lista). Push és `v0.1.0` tag (2026-11-19).
-- **Következő:** a Release workflow eredménye, a draft release átnézése és publikálása.
+- Az első Release és a korábbi CI ugyanazon az `actool`-hibán bukott (a GitHub gépén is, tehát nem környezetfüggő): `scripts/actool-retry/actool` wrapper (hibánál `pkill -9 ibtoold` és újra), a CI és a Release a PATH elejére teszi. A `v0.1.0` tag a felhasználó döntésére áthelyezve a javított commitra (`f829213`), új verziószám helyett.
+- Release run 44629604428 zöld: draft release `KHole-0.1.0-arm64.dmg` (10 MB) + `SHA256SUMS.txt`. Letöltve ellenőrizve: checksum OK, `codesign --verify --deep --strict` OK, Assets.car + LICENSE + notices a Resources-ban, a sidecar fut, verzió 0.1.0.
+- **Következő:** a draft release publikálása (GitHub › Releases), utána a letöltött `.dmg` első indításának kipróbálása (Open Anyway).
