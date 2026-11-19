@@ -580,6 +580,7 @@ Alapelvek:
 | 2026-11-17 | Release: `v*` tag → GitHub Actions → **draft** release (`.dmg` + `SHA256SUMS.txt`), a release notes a `docs/release-notes/v<verzió>.md`-ből | Publikálás előtt átnézhető; a tag és a verzió egyezését a workflow ellenőrzi |
 | 2026-11-17 | `THIRD_PARTY_NOTICES.md` saját szkripttel (`scripts/third-party-notices.mjs`): a Rust normál függőségei, a Vite-bundle-be ténylegesen bekerülő JS-csomagok, a sidecar könyvtárai, deduplikált licencszövegekkel. A LICENSE-szel együtt az `.app` Resources-ában, a Help menüből nyitható | Nincs külső eszköz (cargo-about) függőség; a release build újragenerálja, így pontosan a linkelt verziókat írja le |
 | 2026-11-19 | GitHub-felhasználónév: `tomi2400` → `tamaspekker`; minden URL, a remote és a copyright („Tamas Pekker”) átírva, a bundle identifier (`io.github.tomi2400.khole`) **marad** | Az identifier az adatbázis helye (`app_data_dir`): váltásnál eltűnnének a sessionök; csak belső azonosító, nem kell egyeznie a GitHub-névvel |
+| 2026-11-19 | Adomány: Ko-fi (`ko-fi.com/tamaspekker`), Stripe-pal (magánszemély, EUR kifizetés Revolutra). Az appban csak halkan: Help › Support KHole ☕…, egy sor a Summary alján (ha volt döntés); `FUNDING.yml`, README, release notes. A link egy helyen: `menu.rs` `SUPPORT` | A GPL engedi; felugró ablak nincs, munkaeszközben zavarna. A Ko-fi egyszeri tippnél nem von le jutalékot, a Stripe olcsóbb a PayPalnál |
 
 ---
 
@@ -767,4 +768,5 @@ Alapelvek:
 - **Buktató (actool):** Claude Code alól futtatva a bundler első `actool`-hívása mindig „attempt to insert nil object” hibával száll el, kézzel ugyanazokkal az argumentumokkal, ugyanabból a környezetből viszont sikerül. Megoldás: egy `actool` wrapper a PATH elején, ami hibánál `pkill -9 ibtoold` és újrapróbál – a második menet sikerül. Saját terminálból valószínűleg elég a `pkill -9 -x ibtoold` (a sima `pkill` nem mindig öli meg).
 - `cargo fmt/clippy/test` (94), `typecheck` tiszta.
 - 2026-11-19: GitHub-átnevezés (`tamaspekker`) végigvezetve, a remote frissítve. Az adománygombhoz a felhasználó Stripe + Ko-fi fiókot állít be; a link után: Help menü, Summary, `FUNDING.yml`, README.
-- **Következő:** a Ko-fi link beépítése; a Design kézi tesztje (a Help menüt a felhasználó megnézte, rendben); push, majd `git tag v0.1.0 && git push origin v0.1.0` → a draft release átnézése és publikálása.
+- Ko-fi beépítve: `menu::open_support` command + Help menüpont, Summary-sor (`Coffee` ikon), `.github/FUNDING.yml`. `typecheck`, `clippy` tiszta; a felületet nem láttam.
+- **Következő:** a Design kézi tesztje és a Summary-sor megnézése (a Help menüt a felhasználó megnézte, rendben); push, majd `git tag v0.1.0 && git push origin v0.1.0` → a draft release átnézése és publikálása.

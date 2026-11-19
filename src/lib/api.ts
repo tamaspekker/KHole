@@ -274,6 +274,9 @@ export const api = {
 
   trackPeaks: (trackId: number) =>
     invoke<ArrayBuffer>("track_peaks", { trackId }).then(parsePeaks),
+
+  /** Opens the donation page (Ko-fi) in the browser. */
+  openSupport: () => invoke<null>("open_support"),
 };
 
 export const events = {

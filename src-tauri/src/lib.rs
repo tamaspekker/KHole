@@ -74,6 +74,7 @@ pub fn run() {
             commands::track_apps,
             commands::open_track,
             commands::edit_track,
+            menu::open_support,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

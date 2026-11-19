@@ -7,6 +7,9 @@ use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_opener::OpenerExt;
 
 const REPO: &str = "https://github.com/tamaspekker/KHole";
+/// Donations (Ko-fi). The only place the link lives: the Summary screen calls `open_support`.
+const SUPPORT: &str = "https://ko-fi.com/tamaspekker";
+const DONATE: &str = "help-support";
 const WEBSITE: &str = "help-website";
 const ISSUE: &str = "help-issue";
 const LICENSE: &str = "help-license";
@@ -45,6 +48,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         help.append_items(&[
             &MenuItem::with_id(app, WEBSITE, "KHole on GitHub", true, None::<&str>)?,
             &MenuItem::with_id(app, ISSUE, "Report an Issue…", true, None::<&str>)?,
+            &MenuItem::with_id(app, DONATE, "Support KHole ☕…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, LICENSE, "License (GPL-3.0)", true, None::<&str>)?,
             &MenuItem::with_id(app, NOTICES, "Third-Party Licenses", true, None::<&str>)?,
@@ -60,6 +64,7 @@ pub fn on_event(app: &AppHandle, id: &str) {
         ISSUE => app
             .opener()
             .open_url(format!("{REPO}/issues/new"), None::<&str>),
+        DONATE => app.opener().open_url(SUPPORT, None::<&str>),
         LICENSE => open_resource(app, "LICENSE"),
         NOTICES => open_resource(app, "THIRD_PARTY_NOTICES.md"),
         _ => return,
@@ -67,6 +72,14 @@ pub fn on_event(app: &AppHandle, id: &str) {
     if let Err(e) = result {
         eprintln!("menu {id}: {e}");
     }
+}
+
+/// "Buy me a coffee" from the UI (Summary screen).
+#[tauri::command]
+pub fn open_support(app: AppHandle) -> Result<(), String> {
+    app.opener()
+        .open_url(SUPPORT, None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 /// Opens a file bundled in the app's Resources (see `bundle.resources`) in the default app;

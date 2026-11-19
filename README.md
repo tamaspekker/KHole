@@ -8,6 +8,8 @@ a single key.
 expect rough edges. [Feedback and bug reports](https://github.com/tamaspekker/KHole/issues) are
 very welcome.
 
+KHole is free. If it saves you time, you can [buy me a coffee ☕](https://ko-fi.com/tamaspekker).
+
 ## Features
 
 - **One key per decision:** `1`–`0` send the track to a destination folder, `Enter` keeps it,
