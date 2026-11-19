@@ -35,7 +35,7 @@
     "targets": ["app", "dmg"],
     "category": "public.app-category.music",
     "license": "GPL-3.0-or-later",
-    "copyright": "Copyright © 2026 Tamas (tomi2400). Licensed under GPL-3.0-or-later.",
+    "copyright": "Copyright © 2026 Tamas Pekker. Licensed under GPL-3.0-or-later.",
     "resources": {
       "../LICENSE": "LICENSE",
       "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"

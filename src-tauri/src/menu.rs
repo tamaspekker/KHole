@@ -6,7 +6,7 @@ use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_opener::OpenerExt;
 
-const REPO: &str = "https://github.com/tomi2400/KHole";
+const REPO: &str = "https://github.com/tamaspekker/KHole";
 const WEBSITE: &str = "help-website";
 const ISSUE: &str = "help-issue";
 const LICENSE: &str = "help-license";

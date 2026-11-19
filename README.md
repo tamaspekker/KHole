@@ -5,7 +5,7 @@ each track for a few seconds, and send it to a destination folder, keep it, or t
 a single key.
 
 **Status: 0.1.0, first public release.** It works well for its author's daily promo triage;
-expect rough edges. [Feedback and bug reports](https://github.com/tomi2400/KHole/issues) are
+expect rough edges. [Feedback and bug reports](https://github.com/tamaspekker/KHole/issues) are
 very welcome.
 
 ## Features
@@ -39,7 +39,7 @@ Requirements: **macOS 13 or later on Apple Silicon** (M1 or newer). Intel Macs a
 supported yet.
 
 1. Download `KHole-<version>-arm64.dmg` from the
-   [latest release](https://github.com/tomi2400/KHole/releases/latest).
+   [latest release](https://github.com/tamaspekker/KHole/releases/latest).
 2. Open it and drag **KHole** into **Applications**.
 3. **First launch:** KHole is free and open source, but not signed with a paid Apple
    Developer ID, so macOS will say *“Apple could not verify ‘KHole’ is free of malware”*.
@@ -78,7 +78,7 @@ Requirements: macOS on Apple Silicon, Xcode 26 (for the Liquid Glass app icon; o
 versions fall back to the classic icon), Rust (stable), Node 24, Homebrew.
 
 ```sh
-git clone --recurse-submodules https://github.com/tomi2400/KHole.git
+git clone --recurse-submodules https://github.com/tamaspekker/KHole.git
 cd KHole
 # (existing clone: git submodule update --init vendor/essentia)
 

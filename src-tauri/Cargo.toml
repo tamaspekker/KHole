@@ -2,9 +2,9 @@
 name = "khole"
 version = "0.1.0"
 description = "DJ track triage for macOS"
-authors = ["Tamas"]
+authors = ["Tamas Pekker"]
 license = "GPL-3.0-or-later"
-repository = "https://github.com/tomi2400/KHole"
+repository = "https://github.com/tamaspekker/KHole"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

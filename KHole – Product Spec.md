@@ -1,6 +1,6 @@
 ---
 tags: [khole, projekt, spec]
-repo: https://github.com/tomi2400/KHole
+repo: https://github.com/tamaspekker/KHole
 updated: 2026-11-07
 ---
 
@@ -213,6 +213,6 @@ Ha egy formátum mégsem szól, a tartalék a Rust oldali dekódolás. Ezt csak 
 | Platform | Egyelőre csak Mac |
 | Formátumok | Mind: MP3, WAV, AIFF, FLAC, M4A, ALAC |
 | 9-nél több célmappa | 1–0 gombok + M = Move to… kereső |
-| Repo | [github.com/tomi2400/KHole](https://github.com/tomi2400/KHole.git) |
+| Repo | [github.com/tamaspekker/KHole](https://github.com/tamaspekker/KHole.git) |
 
 **Még nyitott:** a domain. (Az AIFF a prototípusban gond nélkül szól, lásd `docs/spike-results.md`.)
