@@ -10,7 +10,7 @@ use super::{file_key::file_key, tags};
 use crate::error::Result;
 use crate::store::{self, Store, sessions, tracks};
 
-/// Lower-case extensions that the WebView plays (see docs/spike-results.md).
+/// Lower-case extensions that the WebView plays (tested in the playback spike).
 pub const AUDIO_EXTENSIONS: &[&str] = &["mp3", "wav", "aif", "aiff", "flac", "m4a", "aac"];
 
 /// Rows written per DB transaction, so the UI's queries are never blocked for long.

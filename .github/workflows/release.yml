@@ -97,11 +97,11 @@ jobs:
           test -f "$app/Contents/Resources/THIRD_PARTY_NOTICES.md"
           "$app/Contents/MacOS/khole-analyze" --version
 
-      - name: Rename and checksum
+      # GitHub shows each release file's SHA-256 itself; no separate checksum file.
+      - name: Rename
         run: |
           mkdir out
           cp "src-tauri/target/release/bundle/dmg/KHole_${VERSION}_aarch64.dmg" "out/KHole-${VERSION}-arm64.dmg"
-          cd out && shasum -a 256 ./*.dmg > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - name: Draft release
         env:

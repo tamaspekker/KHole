@@ -1,4 +1,4 @@
-//! Accuracy and speed on a real folder (open questions 1–2 in docs/DEVELOPMENT.md):
+//! BPM accuracy and analysis speed on a real folder:
 //! tag BPM / key against the analysis, wall-clock time with the queue's thread count.
 //!
 //! `KHOLE_BENCH_DIR=~/Music/promo cargo test --release bench_folder -- --ignored --nocapture`

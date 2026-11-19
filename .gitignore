@@ -26,3 +26,11 @@ spike/fixtures/*.m4a
 !.vscode/extensions.json
 .idea/
 *.local
+
+# Private working notes (kept locally, not published): agent instructions, development
+# log, product spec, spike measurements and throwaway prototype code.
+CLAUDE.md
+docs/DEVELOPMENT.md
+docs/spike-results.md
+KHole – Product Spec.md
+spike/
