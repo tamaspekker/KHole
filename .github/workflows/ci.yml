@@ -71,6 +71,10 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
+      # Xcode 26: the first actool run for the Liquid Glass icon fails; the wrapper retries.
+      - name: actool retry wrapper
+        run: echo "$GITHUB_WORKSPACE/scripts/actool-retry" >> "$GITHUB_PATH"
+
       - name: Tauri – build (unsigned .app)
         run: npm run tauri build -- --bundles app
 

@@ -1,0 +1,31 @@
+#!/bin/sh
+# Works around an Xcode 26 actool bug: when the Tauri bundler compiles the Liquid Glass icon
+# (KHole.icon → Assets.car), the first `actool --compile` fails with "attempt to insert nil
+# object" from its helper daemon `ibtoold`. Restarting the daemon and running the same
+# command again succeeds. Put this directory first in PATH before `tauri build`:
+#
+#   PATH="$PWD/scripts/actool-retry:$PATH" npm run tauri build
+#
+# Anything other than --compile passes straight through to the real actool.
+REAL=/usr/bin/actool
+case " $* " in
+  *" --compile "*) ;;
+  *) exec "$REAL" "$@" ;;
+esac
+
+attempt=1
+while :; do
+  out=$("$REAL" "$@" 2>&1)
+  status=$?
+  case "$out" in
+    *"attempt to insert nil object"*) ;;
+    *) printf '%s\n' "$out"; exit "$status" ;;
+  esac
+  if [ "$attempt" -ge 3 ]; then
+    printf '%s\n' "$out"
+    exit 1
+  fi
+  echo "actool-retry: ibtoold failed (attempt $attempt), restarting it" >&2
+  pkill -9 -x ibtoold 2>/dev/null
+  attempt=$((attempt + 1))
+done

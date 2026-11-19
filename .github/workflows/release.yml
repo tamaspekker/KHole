@@ -69,6 +69,10 @@ jobs:
       - name: Third-party notices
         run: node scripts/third-party-notices.mjs
 
+      # Xcode 26: the first actool run for the Liquid Glass icon fails; the wrapper retries.
+      - name: actool retry wrapper
+        run: echo "$GITHUB_WORKSPACE/scripts/actool-retry" >> "$GITHUB_PATH"
+
       - name: Build (ad-hoc signed)
         if: env.DEVELOPER_ID != 'true'
         run: npm run tauri build -- --bundles app,dmg
