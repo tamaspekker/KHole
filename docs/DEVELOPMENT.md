@@ -772,4 +772,5 @@ Alapelvek:
 - Ko-fi beépítve: `menu::open_support` command + Help menüpont, Summary-sor (`Coffee` ikon), `.github/FUNDING.yml`. `typecheck`, `clippy` tiszta; a felületet nem láttam.
 - A felhasználó kérésére a fő felületre is: `SupportButton` (ikon a Triage fejlécében), `SupportLine` (Start alja, Summary). `typecheck` tiszta.
 - Start: a Recent sessions 50-ig, görgethető lista elhalványuló szélekkel, csúszka nélkül (`src/lib/useScrollFade.ts`, `.scroll-fade` az `index.css`-ben); alacsony ablakban összemegy. `typecheck`, `vite build`, `clippy` tiszta; a felületet nem láttam.
-- **Következő:** a Design kézi tesztje, a kávé-elemek és a görgethető Recent lista megnézése (a Help menüt a felhasználó megnézte, rendben); push, majd `git tag v0.1.0 && git push origin v0.1.0` → a draft release átnézése és publikálása.
+- A felhasználó szerint minden rendben (Design-kör, Help menü, kávé-elemek, Recent lista). Push és `v0.1.0` tag (2026-11-19).
+- **Következő:** a Release workflow eredménye, a draft release átnézése és publikálása.
